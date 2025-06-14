@@ -12,6 +12,7 @@
 
   // Listen for messages from the background script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('Content script received message:', request);
     if (request.action === 'showBlockOverlay') {
       showBlockOverlay(request.reason, request.domain);
       sendResponse({ success: true });
@@ -21,9 +22,12 @@
 
   // Function to show block overlay (can be called directly by background script injection)
   function showBlockOverlay(reason, domain) {
+    console.log('Content script showBlockOverlay called:', reason, domain);
+    
     // Remove existing overlay
     const existingOverlay = document.getElementById('focusguard-overlay');
     if (existingOverlay) {
+      console.log('Removing existing overlay');
       existingOverlay.remove();
     }
     

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusGuard Extension Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a6fd8;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔒 FocusGuard Extension Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Extension Status</h2>
+        <div id="extensionStatus" class="status info">Checking extension...</div>
+        <button onclick="checkExtensionStatus()">Check Status</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Functions</h2>
+        <button onclick="addTestSite()">Add Test Site (youtube.com)</button>
+        <button onclick="testPasswordVerification()">Test Password</button>
+        <button onclick="showTestOverlay()">Show Test Overlay</button>
+        <button onclick="clearAllData()">Clear All Data</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Navigation Tests</h2>
+        <button onclick="goToYouTube()">Go to YouTube</button>
+        <button onclick="goToFacebook()">Go to Facebook</button>
+        <button onclick="goToTwitter()">Go to Twitter</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Debug Logs</h2>
+        <div id="debugLogs" class="log">Logs will appear here...</div>
+    </div>
+
+    <script>
+        let logContainer = document.getElementById('debugLogs');
+        let statusContainer = document.getElementById('extensionStatus');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logEntry.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#333';
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[FocusGuard Test] ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusContainer.textContent = message;
+            statusContainer.className = `status ${type}`;
+        }
+
+        function clearLogs() {
+            logContainer.innerHTML = 'Logs cleared...';
+        }
+
+        async function checkExtensionStatus() {
+            log('Checking extension status...');
+            
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+                updateStatus('Chrome extension APIs not available', 'error');
+                log('ERROR: Chrome extension APIs not available', 'error');
+                return;
+            }
+
+            try {
+                // Check if extension is loaded
+                const manifest = chrome.runtime.getManifest();
+                log(`Extension loaded: ${manifest.name} v${manifest.version}`, 'success');
+                updateStatus('Extension is loaded and active', 'success');
+
+                // Check storage
+                const storage = await chrome.storage.local.get(['protectedSites', 'timeTrackingData']);
+                log(`Protected sites: ${storage.protectedSites?.length || 0}`);
+                log(`Time tracking data: ${Object.keys(storage.timeTrackingData || {}).length} domains`);
+
+                // Check current tab
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                const currentTab = tabs[0];
+                if (currentTab) {
+                    const domain = new URL(currentTab.url).hostname;
+                    log(`Current domain: ${domain}`);
+                    
+                    // Check if current site is protected
+                    const protectedSite = storage.protectedSites?.find(site => {
+                        const cleanCurrent = domain.replace(/^www\./, '');
+                        const cleanProtected = site.domain.replace(/^www\./, '');
+                        return cleanCurrent === cleanProtected;
+                    });
+                    
+                    if (protectedSite) {
+                        log(`Current site IS protected: ${JSON.stringify(protectedSite)}`, 'success');
+                    } else {
+                        log('Current site is NOT protected');
+                    }
+                }
+
+            } catch (error) {
+                log(`ERROR: ${error.message}`, 'error');
+                updateStatus('Extension error detected', 'error');
+            }
+        }
+
+        async function addTestSite() {
+            log('Adding YouTube as test protected site...');
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'addProtectedSite',
+                    data: {
+                        domain: 'youtube.com',
+                        password: 'test123',
+                        timeLimit: 30
+                    }
+                });
+                
+                if (response?.success) {
+                    log('YouTube added successfully!', 'success');
+                } else {
+                    log(`Failed to add YouTube: ${response?.error}`, 'error');
+                }
+            } catch (error) {
+                log(`ERROR adding site: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPasswordVerification() {
+            log('Testing password verification...');
+            
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: 'verifyPassword',
+                    domain: 'youtube.com',
+                    password: 'test123'
+                });
+                
+                if (response?.success) {
+                    log('Password verification successful!', 'success');
+                } else {
+                    log(`Password verification failed: ${response?.error}`, 'error');
+                }
+            } catch (error) {
+                log(`ERROR testing password: ${error.message}`, 'error');
+            }
+        }
+
+        function showTestOverlay() {
+            log('Showing test overlay...');
+            
+            // Create test overlay similar to the extension
+            const overlay = document.createElement('div');
+            overlay.id = 'test-overlay';
+            overlay.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                z-index: 2147483647 !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                font-family: Arial, sans-serif !important;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white !important;
+                padding: 40px !important;
+                border-radius: 20px !important;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
+                text-align: center !important;
+                max-width: 400px !important;
+            `;
+            
+            content.innerHTML = `
+                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important;">🔒 Test Overlay</h2>
+                <p style="color: #666 !important; margin: 0 0 20px 0 !important;">This is a test overlay to verify CSS injection works</p>
+                <button id="test-close" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important;">Close</button>
+            `;
+            
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+            
+            document.getElementById('test-close').onclick = () => {
+                overlay.remove();
+                log('Test overlay closed');
+            };
+            
+            log('Test overlay displayed');
+        }
+
+        async function clearAllData() {
+            log('Clearing all extension data...');
+            
+            try {
+                await chrome.storage.local.clear();
+                await chrome.storage.local.set({
+                    protectedSites: [],
+                    timeTrackingData: {}
+                });
+                log('All data cleared!', 'success');
+            } catch (error) {
+                log(`ERROR clearing data: ${error.message}`, 'error');
+            }
+        }
+
+        function goToYouTube() {
+            log('Navigating to YouTube...');
+            window.location.href = 'https://youtube.com';
+        }
+
+        function goToFacebook() {
+            log('Navigating to Facebook...');
+            window.location.href = 'https://facebook.com';
+        }
+
+        function goToTwitter() {
+            log('Navigating to Twitter...');
+            window.location.href = 'https://twitter.com';
+        }
+
+        // Auto-check status on load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(checkExtensionStatus, 1000);
+        });
+
+        // Listen for extension messages
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+            chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+                log(`Received message: ${JSON.stringify(request)}`);
+                return true;
+            });
+        }
+    </script>
+</body>
+</html> 
