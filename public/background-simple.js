@@ -197,6 +197,11 @@ class SimpleFocusGuard {
           }
           break;
           
+        case 'getAnalytics':
+          const analytics = await this.getAnalytics(request.period || 7);
+          sendResponse({ success: true, data: analytics });
+          break;
+          
         default:
           sendResponse({ success: false, error: 'Unknown action' });
       }
@@ -264,6 +269,54 @@ class SimpleFocusGuard {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async getAnalytics(period = 7) {
+    const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
+    const data = timeTrackingData || {};
+    
+    return this.calculateAnalytics(data, period);
+  }
+
+  calculateAnalytics(timeTrackingData, period) {
+    const analytics = {};
+    const dates = this.getDatesRange(period);
+
+    Object.entries(timeTrackingData).forEach(([domain, domainData]) => {
+      analytics[domain] = {
+        totalTime: 0,
+        dailyData: {},
+        averageDaily: 0
+      };
+
+      let validDays = 0;
+
+      dates.forEach(date => {
+        const dayTime = domainData[date] || 0;
+        analytics[domain].dailyData[date] = dayTime;
+        analytics[domain].totalTime += dayTime;
+
+        if (dayTime > 0) validDays++;
+      });
+
+      analytics[domain].averageDaily = validDays > 0 ? 
+        analytics[domain].totalTime / validDays : 0;
+    });
+
+    return analytics;
+  }
+
+  getDatesRange(days) {
+    const dates = [];
+    const now = new Date();
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      dates.push(date.toDateString());
+    }
+
+    return dates;
   }
 }
 

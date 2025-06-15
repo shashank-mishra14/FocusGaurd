@@ -145,11 +145,11 @@ async function resetAll() {
 }
 
 function openDashboard() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
+  chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
 }
 
 function openPopup() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('extension-popup/index.html') });
+  chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
 }
 
 function formatTime(milliseconds) {

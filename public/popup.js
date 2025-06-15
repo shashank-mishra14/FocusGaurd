@@ -284,7 +284,7 @@ function openSettings() {
 }
 
 function openDashboard() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') });
+  chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
   window.close();
 }
 
