@@ -145,7 +145,8 @@ async function resetAll() {
 }
 
 function openDashboard() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
+  // Open the authenticated Next.js dashboard instead of analytics.html
+  chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
 }
 
 function openPopup() {

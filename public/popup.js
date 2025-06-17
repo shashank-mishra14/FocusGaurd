@@ -269,12 +269,45 @@ function showTab(tabName, clickedElement = null) {
 }
 
 function openSettings() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
+  // Open the authenticated Next.js settings instead of options.html
+  chrome.tabs.create({ url: 'http://localhost:3000/dashboard?tab=settings' });
   window.close();
 }
 
-function openDashboard() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
+async function openDashboard() {
+  try {
+    // Try to generate a session token for seamless authentication
+    const response = await fetch('http://localhost:3000/api/extension/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'generate',
+        extensionId: chrome.runtime.id
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.token) {
+        // Open dashboard with session token
+        chrome.tabs.create({ 
+          url: `http://localhost:3000/extension-popup?token=${data.token}&redirect=dashboard` 
+        });
+      } else {
+        // Fallback to regular dashboard
+        chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+      }
+    } else {
+      // Fallback to regular dashboard
+      chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+    }
+  } catch (error) {
+    console.error('Error opening dashboard:', error);
+    // Fallback to regular dashboard
+    chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+  }
   window.close();
 }
 

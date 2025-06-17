@@ -22,13 +22,7 @@ interface ProtectedSite {
   createdAt: number;
 }
 
-interface TimeTrackingData {
-  [domain: string]: {
-    [date: string]: number;
-  };
-}
-
-export default function ExtensionPopup() {
+export default function ExtensionPopupFixed() {
   const [newSiteUrl, setNewSiteUrl] = useState("")
   const [newSitePassword, setNewSitePassword] = useState("")
   const [timeLimit, setTimeLimit] = useState([60])
@@ -54,8 +48,7 @@ export default function ExtensionPopup() {
   }, [])
 
   const checkExtensionContext = () => {
-    // Check if we're running in a Chrome extension context
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest) {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
       setIsExtensionContext(true)
     } else {
       setIsExtensionContext(false)
@@ -77,32 +70,19 @@ export default function ExtensionPopup() {
       setLoading(true)
       
       // Get current tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      const tab = tabs[0]
-      if (tab && tab.url && !tab.url.startsWith('chrome://')) {
-        const domain = new URL(tab.url).hostname
-        setCurrentDomain(domain)
-        
-        // Get today's analytics for current domain
-        const analytics = await chrome.runtime.sendMessage({
-          action: 'getAnalytics',
-          period: 1
-        })
-        
-        if (analytics?.success && analytics.data[domain]) {
-          const todayTime = Object.values(analytics.data[domain].dailyData)[0] as number || 0
-          setDailyUsage(prev => ({ ...prev, todayTime }))
+      if (chrome.tabs) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        const tab = tabs[0]
+        if (tab?.url && !tab.url.startsWith('chrome://')) {
+          const domain = new URL(tab.url).hostname
+          setCurrentDomain(domain)
         }
       }
       
-      // Load protected sites
-      const { protectedSites: sites } = await chrome.storage.local.get(['protectedSites'])
-      setProtectedSites(sites || [])
-      
-      // Load time tracking data for overall stats
-      const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData'])
-      if (timeTrackingData) {
-        calculateOverallStats(timeTrackingData)
+      // Load protected sites from storage
+      if (chrome.storage) {
+        const { protectedSites: sites } = await chrome.storage.local.get(['protectedSites'])
+        setProtectedSites(sites || [])
       }
       
     } catch (error) {
@@ -111,26 +91,6 @@ export default function ExtensionPopup() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const calculateOverallStats = (timeTrackingData: TimeTrackingData) => {
-    const today = new Date().toDateString()
-    let totalTimeToday = 0
-    let sitesVisitedToday = 0
-
-    Object.values(timeTrackingData).forEach(siteData => {
-      const dayTime = siteData[today] || 0
-      totalTimeToday += dayTime
-      if (dayTime > 0) sitesVisitedToday++
-    })
-
-    setDailyUsage(prev => ({
-      ...prev,
-      totalTime: Math.floor(totalTimeToday / 60000), // Convert to minutes
-      sitesVisited: sitesVisitedToday
-    }))
-
-    setProgressValue((totalTimeToday / 60000 / dailyUsage.dailyLimit) * 100)
   }
 
   const handleAddSite = async () => {
@@ -142,41 +102,28 @@ export default function ExtensionPopup() {
     try {
       setError('')
       const siteData = {
+        id: Date.now().toString(),
         domain: newSiteUrl.replace(/^https?:\/\//, '').replace(/^www\./, ''),
         password: passwordProtected ? newSitePassword : undefined,
-        timeLimit: timeLimit[0]
+        passwordProtected,
+        timeLimit: timeLimit[0],
+        createdAt: Date.now()
       }
 
-      if (isExtensionContext) {
-        const response = await chrome.runtime.sendMessage({
-          action: 'addProtectedSite',
-          data: siteData
-        })
-
-        if (response?.success) {
-          await loadData() // Reload the sites
-          setNewSiteUrl('')
-          setNewSitePassword('')
-          setPasswordProtected(false)
-          setTimeLimit([60])
-        } else {
-          setError('Failed to add site: ' + (response?.error || 'Unknown error'))
-        }
+      if (isExtensionContext && chrome.storage) {
+        const { protectedSites: currentSites } = await chrome.storage.local.get(['protectedSites'])
+        const updatedSites = [...(currentSites || []), siteData]
+        await chrome.storage.local.set({ protectedSites: updatedSites })
+        setProtectedSites(updatedSites)
       } else {
         // Mock functionality for development
-        const newSite: ProtectedSite = {
-          id: Date.now().toString(),
-          domain: siteData.domain,
-          timeLimit: siteData.timeLimit,
-          passwordProtected: !!siteData.password,
-          createdAt: Date.now()
-        }
-        setProtectedSites(prev => [...prev, newSite])
-        setNewSiteUrl('')
-        setNewSitePassword('')
-        setPasswordProtected(false)
-        setTimeLimit([60])
+        setProtectedSites(prev => [...prev, siteData])
       }
+
+      setNewSiteUrl('')
+      setNewSitePassword('')
+      setPasswordProtected(false)
+      setTimeLimit([60])
     } catch (error) {
       console.error('Error adding site:', error)
       setError('Failed to add site')
@@ -187,17 +134,11 @@ export default function ExtensionPopup() {
     if (!confirm(`Remove ${domain} from protected sites?`)) return
 
     try {
-      if (isExtensionContext) {
-        const response = await chrome.runtime.sendMessage({
-          action: 'removeProtectedSite',
-          domain
-        })
-
-        if (response?.success) {
-          await loadData()
-        } else {
-          setError('Failed to remove site')
-        }
+      if (isExtensionContext && chrome.storage) {
+        const { protectedSites: currentSites } = await chrome.storage.local.get(['protectedSites'])
+        const updatedSites = (currentSites || []).filter((site: ProtectedSite) => site.domain !== domain)
+        await chrome.storage.local.set({ protectedSites: updatedSites })
+        setProtectedSites(updatedSites)
       } else {
         setProtectedSites(prev => prev.filter(site => site.domain !== domain))
       }
@@ -207,11 +148,11 @@ export default function ExtensionPopup() {
     }
   }
 
-  const openAnalytics = async () => {
+  const openDashboard = async () => {
     try {
       if (isExtensionContext) {
         // Generate session token for extension access
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/extension/session`, {
+        const response = await fetch('http://localhost:3000/api/extension/session', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -223,16 +164,20 @@ export default function ExtensionPopup() {
           chrome.tabs.create({ url: data.dashboardUrl })
         } else {
           // User needs to sign in first
-          chrome.tabs.create({ url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/sign-in?redirect_url=/dashboard` })
+          chrome.tabs.create({ 
+            url: 'http://localhost:3000/sign-in?redirect_url=/dashboard' 
+          })
         }
       } else {
         window.open('/dashboard', '_blank')
       }
     } catch (error) {
-      console.error('Error opening analytics:', error)
+      console.error('Error opening dashboard:', error)
       // Fallback to sign-in page
       if (isExtensionContext) {
-        chrome.tabs.create({ url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/sign-in?redirect_url=/dashboard` })
+        chrome.tabs.create({ 
+          url: 'http://localhost:3000/sign-in?redirect_url=/dashboard' 
+        })
       } else {
         window.open('/sign-in?redirect_url=/dashboard', '_blank')
       }
@@ -242,8 +187,8 @@ export default function ExtensionPopup() {
   const openSettings = async () => {
     try {
       if (isExtensionContext) {
-        // For now, just show an alert - you can implement settings later
-        alert('Settings coming soon! Use the dashboard for configuration.')
+        // For now, redirect to dashboard for settings
+        await openDashboard()
       } else {
         window.open('/dashboard', '_blank')
       }
@@ -334,10 +279,22 @@ export default function ExtensionPopup() {
           )}
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" className="hover:bg-purple-100 transition-colors duration-300" onClick={openAnalytics} title="Open Dashboard">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="hover:bg-purple-100 transition-colors duration-300" 
+            onClick={openDashboard} 
+            title="Open Dashboard"
+          >
             <BarChart3 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="hover:bg-blue-100 transition-colors duration-300" onClick={openSettings} title="Settings">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="hover:bg-blue-100 transition-colors duration-300" 
+            onClick={openSettings} 
+            title="Settings"
+          >
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -381,7 +338,7 @@ export default function ExtensionPopup() {
       >
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Today's Usage</span>
+            <span className="text-gray-600">Today&apos;s Usage</span>
             <span className="font-medium">
               {dailyUsage.totalTime}m / {dailyUsage.dailyLimit}m
             </span>
@@ -395,18 +352,53 @@ export default function ExtensionPopup() {
       </div>
 
       {/* Main Content */}
-      <Tabs defaultValue="sites" className="w-full">
+      <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="grid w-full grid-cols-3 m-2">
+          <TabsTrigger value="dashboard" className="text-xs transition-all duration-300 hover:bg-purple-100">
+            📊 Dashboard
+          </TabsTrigger>
           <TabsTrigger value="sites" className="text-xs transition-all duration-300 hover:bg-blue-100">
-            Protected Sites
+            🛡️ Sites
           </TabsTrigger>
           <TabsTrigger value="add" className="text-xs transition-all duration-300 hover:bg-green-100">
-            Add Site
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="text-xs transition-all duration-300 hover:bg-purple-100">
-            Analytics
+            ➕ Add Site
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="p-4 space-y-4">
+          <div className={`space-y-3 ${isVisible ? "animate-fadeIn" : "opacity-0"}`} style={{ animationDelay: "0.3s" }}>
+            <Button
+              className="w-full transition-all duration-300 hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              onClick={openDashboard}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              📊 Open Full Dashboard
+              <ExternalLink className="h-3 w-3 ml-2" />
+            </Button>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
+                <div className="text-lg font-bold text-blue-600">{protectedSites.length}</div>
+                <div className="text-xs text-gray-500">Protected Sites</div>
+              </Card>
+              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
+                <div className="text-lg font-bold text-green-600">{formatTime(dailyUsage.totalTime)}</div>
+                <div className="text-xs text-gray-500">Today&apos;s Usage</div>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
+                <div className="text-lg font-bold text-purple-600">{dailyUsage.sitesVisited}</div>
+                <div className="text-xs text-gray-500">Sites Visited</div>
+              </Card>
+              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
+                <div className="text-lg font-bold text-orange-600">{Math.round((dailyUsage.totalTime / dailyUsage.dailyLimit) * 100)}%</div>
+                <div className="text-xs text-gray-500">Daily Progress</div>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
         <TabsContent value="sites" className="p-4 space-y-3">
           <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -536,41 +528,6 @@ export default function ExtensionPopup() {
               <Plus className="h-4 w-4 mr-2" />
               Add Protected Site
             </Button>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="p-4 space-y-4">
-          <div className={`space-y-3 ${isVisible ? "animate-fadeIn" : "opacity-0"}`} style={{ animationDelay: "0.3s" }}>
-            <Button
-              className="w-full transition-all duration-300 hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              onClick={openAnalytics}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              📊 Open Dashboard
-              <ExternalLink className="h-3 w-3 ml-2" />
-            </Button>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
-                <div className="text-lg font-bold text-blue-600">{protectedSites.length}</div>
-                <div className="text-xs text-gray-500">Protected Sites</div>
-              </Card>
-              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
-                <div className="text-lg font-bold text-green-600">{formatTime(dailyUsage.totalTime)}</div>
-                <div className="text-xs text-gray-500">Today's Usage</div>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
-                <div className="text-lg font-bold text-purple-600">{dailyUsage.sitesVisited}</div>
-                <div className="text-xs text-gray-500">Sites Visited</div>
-              </Card>
-              <Card className="p-3 text-center transition-all duration-300 hover:shadow-md">
-                <div className="text-lg font-bold text-orange-600">{Math.round((dailyUsage.totalTime / dailyUsage.dailyLimit) * 100)}%</div>
-                <div className="text-xs text-gray-500">Daily Progress</div>
-              </Card>
-            </div>
           </div>
         </TabsContent>
       </Tabs>
