@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Shield, Clock, BarChart3, Plus, Settings, ExternalLink, Trash2, Edit, Zap, Globe, AlertCircle } from "lucide-react"
+import { Shield, Clock, BarChart3, Plus, Settings, ExternalLink, Trash2, Zap, Globe, AlertCircle } from "lucide-react"
 
 interface ProtectedSite {
   id: string;
@@ -207,11 +207,35 @@ export default function ExtensionPopup() {
     }
   }
 
-  const openAnalytics = () => {
-    if (isExtensionContext) {
-      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/index.html') })
-    } else {
-      window.open('/dashboard', '_blank')
+  const openAnalytics = async () => {
+    try {
+      if (isExtensionContext) {
+        // Generate session token for extension access
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/extension/session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          chrome.tabs.create({ url: data.dashboardUrl })
+        } else {
+          // User needs to sign in first
+          chrome.tabs.create({ url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/sign-in?redirect_url=/dashboard` })
+        }
+      } else {
+        window.open('/dashboard', '_blank')
+      }
+    } catch (error) {
+      console.error('Error opening analytics:', error)
+      // Fallback to sign-in page
+      if (isExtensionContext) {
+        chrome.tabs.create({ url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/sign-in?redirect_url=/dashboard` })
+      } else {
+        window.open('/sign-in?redirect_url=/dashboard', '_blank')
+      }
     }
   }
 

@@ -1,207 +1,250 @@
-# FocusGuard - Website Blocker & Time Manager
+# Protekt - Web Protection & Analytics Platform
 
-A secure, robust browser extension that allows users to password-protect websites, set time limits, and track usage with detailed analytics.
+A comprehensive web application with browser extension for tracking browsing habits and protecting against distracting websites. Features user authentication via Clerk, personal analytics dashboards, and seamless extension-to-dashboard connectivity.
 
 ## 🚀 Features
 
-- **Password Protection**: Secure websites with hashed passwords
-- **Time Limits**: Set daily time limits for specific sites
-- **Real-time Blocking**: Instant blocking when limits are reached
-- **Analytics Dashboard**: Detailed time tracking and usage statistics
-- **Import/Export**: Backup and restore settings
-- **Secure Storage**: Local encrypted storage with SHA-256 hashing
-- **Beautiful UI**: Modern Next.js interface with Tailwind CSS
-
-## 📁 Project Structure
-
-```
-my-app/
-├── public/                          # Chrome Extension Files
-│   ├── manifest.json               # Extension manifest (v3)
-│   ├── background.js               # Background service worker
-│   ├── content.js                  # Content script
-│   ├── options.html                # Options page
-│   ├── options.js                  # Options page script
-│   ├── rules.json                  # Declarative net request rules
-│   └── icons/                      # Extension icons (16, 32, 48, 128px)
-├── app/                            # Next.js App Router
-│   ├── extension-popup/            # Extension popup page
-│   ├── dashboard/                  # Analytics dashboard
-│   └── page.tsx                    # Main landing page
-├── components/                     # React Components
-│   ├── extension-popup.tsx         # Main popup component
-│   └── ui/                         # Shadcn/ui components
-├── lib/                            # Utilities
-│   └── extension/                  # Extension utilities
-│       ├── types.ts                # TypeScript interfaces
-│       ├── utils.ts                # Utility functions
-│       └── chrome-types.d.ts       # Chrome API types
-└── ...
-```
+- **User Authentication**: Secure authentication powered by Clerk
+- **Personal Analytics Dashboard**: Track browsing time, site visits, and productivity metrics
+- **Browser Extension Integration**: Seamless connection between extension and web dashboard
+- **Site Protection**: Block distracting websites with passwords and time limits
+- **Real-time Data Sync**: Extension data automatically syncs to your personal dashboard
+- **Session-based Access**: Access dashboard directly from extension without repeated login
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **UI Components**: Shadcn/ui, Tailwind CSS, Lucide React
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Authentication**: Clerk
+- **Database**: PostgreSQL (Neon DB)
+- **ORM**: Drizzle ORM
+- **UI Components**: Radix UI, Lucide Icons
 - **Charts**: Recharts
-- **Extension**: Chrome Extension Manifest V3
-- **Security**: Web Crypto API (SHA-256 hashing)
-- **Storage**: Chrome Storage API
 
-## 📋 Current Status
+## 📋 Prerequisites
 
-### ✅ Completed
-- ✅ Extension manifest and structure
-- ✅ Background service worker with core functionality
-- ✅ Content script for site blocking overlays
-- ✅ TypeScript interfaces and utility functions
-- ✅ Options page for settings management
-- ✅ Next.js popup component with Chrome API integration
-- ✅ Secure password hashing with Web Crypto API
-- ✅ Time tracking and analytics foundation
-- ✅ Import/export functionality
+- Node.js 18+ and npm
+- Clerk account and application
+- Neon Database account
 
-### 🚧 Next Steps Required
+## ⚙️ Environment Setup
 
-#### 1. **Create Extension Icons** (High Priority)
-```bash
-# Create these files in public/icons/
-icon16.png   # 16x16 pixels
-icon32.png   # 32x32 pixels  
-icon48.png   # 48x48 pixels
-icon128.png  # 128x128 pixels
+Create a `.env.local` file in the root directory:
+
+```env
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_d2VsY29tZS1jYWltYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA
+CLERK_SECRET_KEY=sk_test_your_secret_key_here
+
+# Neon Database
+DATABASE_URL=postgresql://neondb_owner:npg_tGVHncAfl3J9@ep-little-bread-a88kexhn-pooler.eastus2.azure.neon.tech/neondb?sslmode=require
+
+# Next.js
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-**Recommendations:**
-- Use a shield or lock symbol with brand colors (#667eea, #764ba2)
-- Try [Favicon.io](https://www.favicon.io/) for quick generation
-- Ensure good visibility at small sizes
+## 🚀 Installation & Setup
 
-#### 2. **Build Extension Package**
-```bash
-# Create extension build
-npm run build:extension
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Set up the database**:
+   ```bash
+   # Generate database migrations
+   npm run db:generate
+   
+   # Push schema to database
+   npm run db:push
+   ```
+
+3. **Configure Clerk**:
+   - Set up your Clerk application
+   - Add your publishable and secret keys to `.env.local`
+   - Configure redirect URLs in Clerk dashboard
+
+4. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+Visit `http://localhost:3000` to see the application.
+
+## 🏗️ Architecture Overview
+
+### User Authentication Flow
+
+1. **Web Application**: Users sign up/sign in via Clerk authentication
+2. **Database Sync**: User data automatically synced to Neon DB upon first login
+3. **Session Management**: Both web dashboard and extension access use the same user account
+
+### Extension-Dashboard Integration
+
+1. **Extension Installation**: Users install the browser extension after creating an account
+2. **Token Generation**: Extension requests a session token from the web app API
+3. **Dashboard Access**: Extension can open the dashboard with pre-authenticated session
+4. **Data Sync**: Analytics data flows from extension to database to dashboard
+
+### Database Schema
+
+- **users**: Core user information synced from Clerk
+- **protected_sites**: User's blocked websites configuration
+- **time_tracking**: Browsing analytics data from extension
+- **user_settings**: User preferences and limits
+- **extension_sessions**: Temporary tokens for extension-dashboard connectivity
+
+## 📊 API Endpoints
+
+### Authentication
+- `GET /api/auth/user` - Get/create user data
+- `PUT /api/auth/user` - Update user information
+
+### Extension Sessions
+- `POST /api/extension/session` - Generate session token for extension
+- `GET /api/extension/session?token=` - Validate session token
+
+### Protected Sites
+- `GET /api/protected-sites` - Get user's protected sites
+- `POST /api/protected-sites` - Add new protected site
+- `DELETE /api/protected-sites?id=` - Remove protected site
+
+### Analytics
+- `GET /api/analytics?days=` - Get analytics data for dashboard
+- `POST /api/analytics?token=` - Submit analytics data from extension
+
+## 🔧 Browser Extension Integration
+
+### Extension Setup
+1. User creates account on web application
+2. User clicks "Access Dashboard" in extension
+3. If not authenticated, redirected to sign-in page
+4. If authenticated, session token generated automatically
+5. Dashboard opens with user's personal data
+
+### Data Flow
+```
+Extension → API (with session token) → Database → Dashboard
 ```
 
-#### 3. **Test Extension**
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select the `my-app/public` folder
-5. Test all functionality:
-   - Site blocking
-   - Password protection
-   - Time limits
-   - Analytics dashboard
-   - Options page
+### Extension API Usage
+```javascript
+// Generate session token (extension popup)
+const response = await fetch('http://localhost:3000/api/extension/session', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' }
+})
+const { sessionToken, dashboardUrl } = await response.json()
 
-#### 4. **Analytics Dashboard Integration**
-- Complete the analytics dashboard component
-- Integrate Chart.js or update Recharts implementation
-- Connect to the extension's time tracking data
+// Open dashboard with token
+chrome.tabs.create({ url: dashboardUrl })
 
-#### 5. **Advanced Features (Optional)**
-- Session management improvements
-- Better error handling
-- Cross-browser compatibility testing
-- Advanced analytics views
-- Export to different formats
-
-## 🔧 Development Setup
-
-1. **Install dependencies:**
-```bash
-npm install
+// Submit analytics data
+await fetch(`http://localhost:3000/api/analytics?token=${sessionToken}`, {
+  method: 'POST',
+  body: JSON.stringify({
+    domain: 'example.com',
+    timeSpent: 300000, // milliseconds
+    visits: 5,
+    date: '2024-01-15'
+  })
+})
 ```
 
-2. **Start development server:**
+## 🖥️ Dashboard Features
+
+### Analytics Views
+- **Overview**: Daily usage summary, focus scores, site statistics
+- **Time Tracking**: Detailed time spent per site with visualizations
+- **Trends**: Weekly and monthly productivity trends
+- **Site Analysis**: Top sites by time, visits, and productivity impact
+
+### Site Protection
+- **Add Sites**: Protect distracting websites with optional passwords
+- **Time Limits**: Set daily time limits for specific sites
+- **Status Monitoring**: View blocked sites and their current status
+
+### User Settings
+- **Daily Limits**: Configure overall daily browsing limits
+- **Preferences**: Customize dashboard and extension behavior
+- **Extension Token**: Generate new session tokens for extension access
+
+## 🔒 Security Features
+
+- **Clerk Authentication**: Enterprise-grade user authentication
+- **Session Tokens**: Temporary, expiring tokens for extension access
+- **User Isolation**: Each user's data completely isolated
+- **Secure API**: All endpoints protected with authentication
+- **Input Validation**: Comprehensive validation on all user inputs
+
+## 🚀 Deployment
+
+### Vercel Deployment
+1. Connect your GitHub repository to Vercel
+2. Add environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Environment Variables for Production
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_production_clerk_key
+CLERK_SECRET_KEY=your_production_clerk_secret
+DATABASE_URL=your_production_neon_db_url
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
+```
+
+## 📱 Extension Deployment
+
+1. **Manifest Update**: Update extension manifest with production URLs
+2. **Chrome Web Store**: Submit extension for review
+3. **User Instructions**: Provide users with extension installation guide
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Error**:
+   - Verify DATABASE_URL in .env.local
+   - Ensure Neon DB is accessible
+   - Run `npm run db:push` to sync schema
+
+2. **Clerk Authentication Error**:
+   - Check CLERK keys in .env.local
+   - Verify redirect URLs in Clerk dashboard
+   - Ensure middleware.ts is properly configured
+
+3. **Extension-Dashboard Connection**:
+   - Verify NEXT_PUBLIC_APP_URL is correct
+   - Check CORS settings if needed
+   - Ensure session token generation works
+
+### Development Tools
+
 ```bash
+# View database schema
+npm run db:studio
+
+# Reset database
+npm run db:push
+
+# View logs
 npm run dev
 ```
 
-3. **View components:**
-- Main app: http://localhost:3000
-- Extension popup: http://localhost:3000/extension-popup
-- Dashboard: http://localhost:3000/dashboard
+## 🤝 Contributing
 
-## 🛡️ Security Features
-
-### Password Security
-- Passwords are hashed using SHA-256 before storage
-- No plain text passwords stored anywhere
-- Session-based access with configurable timeout
-
-### Storage Security
-- All data stored locally using Chrome Storage API
-- No external servers or data transmission
-- User has full control over their data
-
-### Content Security
-- Content scripts use unique IDs to prevent conflicts
-- High z-index overlays to prevent bypassing
-- Secure message passing between components
-
-## 📦 Extension Loading
-
-### For Development:
-1. Build the extension files (if needed)
-2. Open Chrome → `chrome://extensions/`
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked"
-5. Select the `my-app/public` directory
-
-### For Production:
-1. Create production build
-2. Package as .zip file
-3. Submit to Chrome Web Store
-
-## 🔍 Troubleshooting
-
-### Common Issues:
-
-1. **Chrome API errors in development:**
-   - Extension APIs only work when loaded as an extension
-   - Use the demo mode for component development
-
-2. **TypeScript errors:**
-   - Chrome types are installed via `@types/chrome`
-   - Some APIs may need manual type declarations
-
-3. **Build issues:**
-   - Ensure all dependencies are installed
-   - Check that public folder has all required files
-
-## 📚 API Reference
-
-### Background Script Messages:
-- `addProtectedSite` - Add a new protected site
-- `removeProtectedSite` - Remove a protected site
-- `verifyPassword` - Verify site password
-- `getAnalytics` - Get time tracking data
-
-### Storage Schema:
-```typescript
-{
-  protectedSites: ProtectedSite[],
-  timeTrackingData: {
-    [domain: string]: {
-      [date: string]: number // milliseconds
-    }
-  }
-}
-```
-
-## 📝 Contributing
-
-1. Follow the existing code structure
-2. Use TypeScript for all new files
-3. Test in actual Chrome extension environment
-4. Update this README with any changes
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## 📄 License
 
-This project is for educational/personal use. Please review Chrome Web Store policies before publishing.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For support, email support@protekt.app or create an issue in the GitHub repository.
 
 ---
 
-**Ready for the next phase!** The core extension functionality is implemented and ready for testing. The main remaining task is creating the icons and loading the extension in Chrome for testing.
+Built with ❤️ using Next.js, Clerk, and Neon DB

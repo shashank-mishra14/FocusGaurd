@@ -108,15 +108,46 @@ function FloatingElement({ children, delay = 0 }: { children: React.ReactNode; d
   )
 }
 
-export default function AnalyticsDashboard() {
+interface AnalyticsDashboardProps {
+  sessionToken?: string
+}
+
+export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardProps) {
   const [timePeriod, setTimePeriod] = useState("7days")
   const [isVisible, setIsVisible] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [analyticsData, setAnalyticsData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     setIsVisible(true)
-  }, [])
+    loadAnalyticsData()
+  }, [sessionToken])
+
+  const loadAnalyticsData = async () => {
+    try {
+      setLoading(true)
+      const url = sessionToken 
+        ? `/api/analytics?token=${sessionToken}&days=${timePeriod === '7days' ? 7 : timePeriod === '30days' ? 30 : 7}`
+        : `/api/analytics?days=${timePeriod === '7days' ? 7 : timePeriod === '30days' ? 30 : 7}`
+      
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data')
+      }
+      
+      const data = await response.json()
+      setAnalyticsData(data)
+    } catch (error) {
+      console.error('Error loading analytics:', error)
+      setError('Failed to load analytics data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Enhanced Data Sets
   const dailyUsageData = [
