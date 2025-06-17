@@ -28,19 +28,9 @@ function setupEventListeners() {
   });
 
   // Tab switching event listeners
-  document.querySelectorAll('.tab').forEach(tab => {
+  document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
-      const tabName = e.target.textContent.toLowerCase().replace(' ', '');
-      let targetTab = '';
-      
-      if (tabName.includes('sites') || tabName === 'sites') {
-        targetTab = 'sites';
-      } else if (tabName.includes('add') || tabName === 'add') {
-        targetTab = 'add';
-      } else if (tabName.includes('stats') || tabName === 'stats') {
-        targetTab = 'stats';
-      }
-      
+      const targetTab = e.target.dataset.tab;
       if (targetTab) {
         showTab(targetTab, e.target);
       }
@@ -255,7 +245,7 @@ function showTab(tabName, clickedElement = null) {
   });
   
   // Remove active class from all tab buttons
-  document.querySelectorAll('.tab').forEach(tab => {
+  document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.remove('active');
   });
   
@@ -269,9 +259,9 @@ function showTab(tabName, clickedElement = null) {
   if (clickedElement) {
     clickedElement.classList.add('active');
   } else {
-    // Fallback: find the tab button by content
-    document.querySelectorAll('.tab').forEach(tab => {
-      if (tab.textContent.toLowerCase().includes(tabName.toLowerCase())) {
+    // Fallback: find the tab button by data attribute
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      if (tab.dataset.tab === tabName) {
         tab.classList.add('active');
       }
     });

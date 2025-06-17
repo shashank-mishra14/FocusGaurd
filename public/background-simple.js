@@ -63,6 +63,12 @@ class SimpleFocusGuard {
     console.log('Found protected site:', protectedSite);
 
     if (protectedSite && protectedSite.password) {
+      // Check if session is still valid
+      if (protectedSite.lastAccess && this.isSessionValid(protectedSite.lastAccess)) {
+        console.log('Valid session found, allowing access');
+        return;
+      }
+      
       console.log('Site needs password protection, blocking...');
       await this.blockSite(tabId, protectedSite.domain);
     }
@@ -82,6 +88,21 @@ class SimpleFocusGuard {
           const existing = document.getElementById('focusguard-test-overlay');
           if (existing) existing.remove();
           
+          // Prevent all events on the page
+          const preventEvents = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+          };
+          
+          // Add event listeners to capture all input
+          document.addEventListener('keydown', preventEvents, true);
+          document.addEventListener('keyup', preventEvents, true);
+          document.addEventListener('keypress', preventEvents, true);
+          document.addEventListener('input', preventEvents, true);
+          document.addEventListener('click', preventEvents, true);
+          
           // Create overlay
           const overlay = document.createElement('div');
           overlay.id = 'focusguard-test-overlay';
@@ -98,6 +119,13 @@ class SimpleFocusGuard {
             align-items: center !important;
             font-family: Arial, sans-serif !important;
           `;
+          
+          // Capture all events on overlay to prevent bubbling
+          overlay.addEventListener('keydown', (e) => e.stopPropagation());
+          overlay.addEventListener('keyup', (e) => e.stopPropagation());
+          overlay.addEventListener('keypress', (e) => e.stopPropagation());
+          overlay.addEventListener('input', (e) => e.stopPropagation());
+          overlay.addEventListener('click', (e) => e.stopPropagation());
           
           const content = document.createElement('div');
           content.style.cssText = `
@@ -146,21 +174,78 @@ class SimpleFocusGuard {
           overlay.appendChild(content);
           document.body.appendChild(overlay);
           
+          // Function to remove overlay and cleanup
+          const removeOverlay = () => {
+            const overlay = document.getElementById('focusguard-test-overlay');
+            if (overlay) {
+              overlay.remove();
+            }
+            // Remove event listeners
+            document.removeEventListener('keydown', preventEvents, true);
+            document.removeEventListener('keyup', preventEvents, true);
+            document.removeEventListener('keypress', preventEvents, true);
+            document.removeEventListener('input', preventEvents, true);
+            document.removeEventListener('click', preventEvents, true);
+          };
+          
           // Add event listeners
-          document.getElementById('fg-unlock').onclick = () => {
-            const password = document.getElementById('fg-password').value;
+          const passwordInput = document.getElementById('fg-password');
+          const unlockBtn = document.getElementById('fg-unlock');
+          const cancelBtn = document.getElementById('fg-cancel');
+          
+          const handleUnlock = () => {
+            const password = passwordInput.value.trim();
+            if (!password) {
+              passwordInput.focus();
+              return;
+            }
+            
+            unlockBtn.disabled = true;
+            unlockBtn.textContent = 'Verifying...';
+            
             chrome.runtime.sendMessage({
               action: 'verifyPassword',
               domain: domain,
               password: password
+            }, (response) => {
+              if (response && response.success) {
+                unlockBtn.textContent = '✓ Success!';
+                removeOverlay();
+              } else {
+                unlockBtn.disabled = false;
+                unlockBtn.textContent = 'Unlock';
+                passwordInput.value = '';
+                passwordInput.style.borderColor = '#ff4444 !important';
+                passwordInput.placeholder = 'Incorrect password';
+                setTimeout(() => {
+                  passwordInput.style.borderColor = '#ddd !important';
+                  passwordInput.placeholder = 'Password';
+                  passwordInput.focus();
+                }, 2000);
+              }
             });
           };
           
-          document.getElementById('fg-cancel').onclick = () => {
+          unlockBtn.onclick = handleUnlock;
+          
+          cancelBtn.onclick = () => {
+            removeOverlay();
             window.history.back();
           };
           
-          document.getElementById('fg-password').focus();
+          // Handle Enter key in password field
+          passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleUnlock();
+            }
+          });
+          
+          // Focus password input with a delay
+          setTimeout(() => {
+            passwordInput.focus();
+            passwordInput.select();
+          }, 100);
           
           console.log('Overlay injected successfully');
         },
@@ -186,7 +271,8 @@ class SimpleFocusGuard {
         case 'verifyPassword':
           const isValid = await this.verifyPassword(request.domain, request.password);
           if (isValid) {
-            console.log('Password correct, reloading tab');
+            console.log('Password correct, updating session and reloading tab');
+            await this.updateLastAccess(request.domain);
             if (sender.tab) {
               chrome.tabs.reload(sender.tab.id);
             }
@@ -195,6 +281,16 @@ class SimpleFocusGuard {
             console.log('Password incorrect');
             sendResponse({ success: false, error: 'Invalid password' });
           }
+          break;
+          
+        case 'removeProtectedSite':
+          await this.removeProtectedSite(request.domain);
+          sendResponse({ success: true });
+          break;
+          
+        case 'getProtectedSites':
+          const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
+          sendResponse({ success: true, data: protectedSites || [] });
           break;
           
         case 'getAnalytics':
@@ -230,6 +326,17 @@ class SimpleFocusGuard {
     console.log('Site added successfully');
   }
 
+  async removeProtectedSite(domain) {
+    console.log('Removing site:', domain);
+    
+    const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
+    const sites = protectedSites || [];
+    const updatedSites = sites.filter(site => site.domain !== domain);
+    
+    await chrome.storage.local.set({ protectedSites: updatedSites });
+    console.log('Site removed successfully');
+  }
+
   async verifyPassword(domain, password) {
     console.log('Verifying password for:', domain);
     
@@ -261,6 +368,25 @@ class SimpleFocusGuard {
     const matches = clean1 === clean2;
     console.log('Domain match:', clean1, '===', clean2, '?', matches);
     return matches;
+  }
+
+  async updateLastAccess(domain) {
+    console.log('Updating last access for domain:', domain);
+    const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
+    const sites = protectedSites || [];
+    
+    const siteIndex = sites.findIndex(s => s.domain === domain);
+    if (siteIndex !== -1) {
+      sites[siteIndex].lastAccess = Date.now();
+      await chrome.storage.local.set({ protectedSites: sites });
+      console.log('Last access updated successfully');
+    }
+  }
+
+  isSessionValid(lastAccess, sessionDuration = 30 * 60 * 1000) {
+    const isValid = Date.now() - lastAccess <= sessionDuration;
+    console.log('Session validation:', { lastAccess, now: Date.now(), isValid });
+    return isValid;
   }
 
   async hashPassword(password) {

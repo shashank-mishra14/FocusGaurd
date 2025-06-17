@@ -12,161 +12,313 @@
     }
     
     body {
-      width: 380px;
-      min-height: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8fafc;
-    }
-    
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 600;
-    }
-    
-    .content {
-      padding: 20px;
-    }
-    
-    .current-site {
-      background: #e2e8f0;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-    
-    .tab-container {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      width: 360px;
+      min-height: 540px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      color: #1f2937;
       overflow: hidden;
     }
     
-    .tabs {
-      display: flex;
-      background: #f1f5f9;
+    .glass-container {
+      backdrop-filter: blur(20px);
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      height: 100%;
+      position: relative;
     }
     
-    .tab {
+    .header {
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+    }
+    
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    
+    .tagline {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 12px;
+      font-weight: 400;
+    }
+    
+    .content {
+      padding: 24px 20px;
+      height: calc(100% - 80px);
+      overflow-y: auto;
+    }
+    
+    .current-site {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      padding: 16px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      text-align: center;
+    }
+    
+    .current-site strong {
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.95);
+    }
+    
+    .current-time {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+    
+    .nav-tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .nav-tab {
       flex: 1;
-      padding: 10px;
+      padding: 10px 8px;
       text-align: center;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 500;
       border: none;
       background: none;
-      transition: background 0.2s;
+      color: rgba(255, 255, 255, 0.7);
+      border-radius: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
     }
     
-    .tab.active {
-      background: #667eea;
+    .nav-tab.active {
+      background: rgba(255, 255, 255, 0.25);
       color: white;
+      backdrop-filter: blur(10px);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-tab:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
     }
     
     .tab-content {
-      padding: 16px;
-      background: white;
-      min-height: 280px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+      min-height: 320px;
     }
     
     .form-group {
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
     
-    .form-group label {
+    .form-label {
       display: block;
-      margin-bottom: 4px;
-      font-size: 12px;
-      font-weight: 500;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
       color: #374151;
     }
     
-    .form-group input {
+    .form-input {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border: 2px solid rgba(107, 126, 234, 0.1);
+      border-radius: 12px;
       font-size: 14px;
+      background: rgba(255, 255, 255, 0.8);
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
     }
     
-    .form-group input:focus {
+    .form-input:focus {
       outline: none;
       border-color: #667eea;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      transform: translateY(-1px);
+    }
+    
+    .form-input::placeholder {
+      color: #9ca3af;
     }
     
     .slider-container {
-      margin: 8px 0;
-    }
-    
-    .slider {
-      width: 100%;
-      margin: 8px 0;
+      margin: 16px 0;
     }
     
     .slider-value {
       text-align: center;
-      font-weight: 500;
+      font-weight: 600;
       color: #667eea;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      font-size: 16px;
     }
     
-    .checkbox-container {
+    .slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      outline: none;
+      -webkit-appearance: none;
+      margin: 10px 0;
+    }
+    
+    .slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      border: 2px solid #667eea;
+    }
+    
+    .checkbox-group {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 12px 0;
+      gap: 12px;
+      margin: 16px 0;
+      padding: 12px;
+      background: rgba(102, 126, 234, 0.05);
+      border-radius: 12px;
+      border: 1px solid rgba(102, 126, 234, 0.1);
+    }
+    
+    .checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: #667eea;
+    }
+    
+    .checkbox-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
     }
     
     .btn {
       width: 100%;
-      padding: 10px;
+      padding: 14px 20px;
       border: none;
-      border-radius: 6px;
+      border-radius: 12px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s;
+    }
+    
+    .btn:hover::before {
+      left: 100%;
     }
     
     .btn-primary {
-      background: #667eea;
+      background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
     }
     
     .btn-primary:hover {
-      background: #5a6fd8;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
     }
     
     .btn-secondary {
-      background: #6b7280;
-      color: white;
+      background: rgba(107, 114, 128, 0.1);
+      color: #374151;
+      border: 1px solid rgba(107, 114, 128, 0.2);
       margin-top: 8px;
     }
     
+    .btn-secondary:hover {
+      background: rgba(107, 114, 128, 0.15);
+      transform: translateY(-1px);
+    }
+    
     .site-list {
-      max-height: 200px;
+      max-height: 240px;
       overflow-y: auto;
+      padding-right: 4px;
+    }
+    
+    .site-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .site-list::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 2px;
+    }
+    
+    .site-list::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.3);
+      border-radius: 2px;
     }
     
     .site-item {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
       display: flex;
-      justify-content: between;
+      justify-content: space-between;
       align-items: center;
-      padding: 8px;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      margin-bottom: 8px;
-      background: #f9fafb;
+      transition: all 0.3s ease;
+    }
+    
+    .site-item:hover {
+      background: rgba(255, 255, 255, 0.8);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
     
     .site-info {
@@ -174,138 +326,200 @@
     }
     
     .site-domain {
-      font-weight: 500;
-      font-size: 13px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     
     .site-details {
-      font-size: 11px;
+      font-size: 12px;
       color: #6b7280;
-      margin-top: 2px;
+      margin-top: 4px;
     }
     
     .remove-btn {
-      background: #ef4444;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
       border: none;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 10px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .remove-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     }
     
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
     
     .stat-card {
-      background: #f1f5f9;
-      padding: 12px;
-      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(10px);
+      padding: 16px;
+      border-radius: 12px;
       text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.8);
+      transform: translateY(-2px);
     }
     
     .stat-value {
-      font-size: 18px;
-      font-weight: bold;
+      font-size: 20px;
+      font-weight: 700;
       color: #667eea;
+      margin-bottom: 4px;
     }
     
     .stat-label {
-      font-size: 10px;
+      font-size: 11px;
       color: #6b7280;
-      margin-top: 2px;
+      font-weight: 500;
     }
     
-    .error {
-      background: #fee2e2;
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6b7280;
+    }
+    
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+    }
+    
+    .empty-subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .alert-error {
+      background: rgba(254, 226, 226, 0.9);
       color: #991b1b;
-      padding: 8px;
-      border-radius: 4px;
-      margin-bottom: 12px;
-      font-size: 12px;
+      border: 1px solid rgba(254, 202, 202, 0.5);
     }
     
-    .success {
-      background: #d1fae5;
+    .alert-success {
+      background: rgba(209, 250, 229, 0.9);
       color: #065f46;
-      padding: 8px;
-      border-radius: 4px;
-      margin-bottom: 12px;
-      font-size: 12px;
+      border: 1px solid rgba(167, 243, 208, 0.5);
     }
     
     .hidden {
-      display: none;
+      display: none !important;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .tab-content {
+      animation: slideIn 0.3s ease-out;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">
-      <span>🔒 FocusGuard</span>
-    </div>
-    <button id="settingsBtn" style="background:none;border:none;color:white;cursor:pointer;">⚙️</button>
-  </div>
-  
-  <div class="content">
-    <div id="currentSite" class="current-site hidden">
-      <div>Current site: <strong id="currentDomain"></strong></div>
-      <div id="currentTime" style="font-size: 12px; color: #666; margin-top: 4px;"></div>
+  <div class="glass-container">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <span>FocusGuard</span>
+      </div>
+      <div class="tagline">Stay focused, stay protected</div>
     </div>
     
-    <div id="errorMessage" class="error hidden"></div>
-    <div id="successMessage" class="success hidden"></div>
-    
-    <div class="tab-container">
-      <div class="tabs">
-        <button class="tab active">Sites</button>
-        <button class="tab">Add</button>
-        <button class="tab">Stats</button>
+    <div class="content">
+      <div id="currentSite" class="current-site hidden">
+        <div>📍 <strong id="currentDomain"></strong></div>
+        <div id="currentTime" class="current-time"></div>
+      </div>
+      
+      <div id="errorMessage" class="alert alert-error hidden"></div>
+      <div id="successMessage" class="alert alert-success hidden"></div>
+      
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="sites">🏠 Sites</button>
+        <button class="nav-tab" data-tab="add">➕ Add</button>
+        <button class="nav-tab" data-tab="stats">📊 Stats</button>
       </div>
       
       <div id="sitesTab" class="tab-content">
         <div class="site-list" id="siteList">
-          <div style="text-align: center; color: #6b7280; padding: 20px;">
-            <div style="font-size: 24px; margin-bottom: 8px;">🔒</div>
-            <div>No protected sites yet</div>
-            <div style="font-size: 12px;">Add your first site to get started!</div>
+          <div class="empty-state">
+            <div class="empty-icon">🔒</div>
+            <div class="empty-title">No protected sites yet</div>
+            <div class="empty-subtitle">Add your first site to get started!</div>
           </div>
         </div>
       </div>
       
       <div id="addTab" class="tab-content hidden">
         <div class="form-group">
-          <label for="siteUrl">Website URL</label>
-          <input type="text" id="siteUrl" placeholder="e.g., facebook.com">
+          <label class="form-label" for="siteUrl">🌐 Website URL</label>
+          <input type="text" id="siteUrl" class="form-input" placeholder="e.g., facebook.com">
         </div>
         
         <div class="form-group">
-          <label>Daily Time Limit: <span id="timeLimitValue">60</span> minutes</label>
+          <label class="form-label">⏱️ Daily Time Limit: <span id="timeLimitValue">60</span> minutes</label>
           <div class="slider-container">
             <input type="range" id="timeLimit" class="slider" min="5" max="240" value="60" step="5">
-            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #6b7280;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; margin-top: 4px;">
               <span>5 min</span>
               <span>4 hours</span>
             </div>
           </div>
         </div>
         
-        <div class="checkbox-container">
-          <input type="checkbox" id="passwordProtected">
-          <label for="passwordProtected">Password Protection</label>
+        <div class="checkbox-group">
+          <input type="checkbox" id="passwordProtected" class="checkbox">
+          <label for="passwordProtected" class="checkbox-label">🔐 Password Protection</label>
         </div>
         
         <div id="passwordGroup" class="form-group hidden">
-          <label for="sitePassword">Password</label>
-          <input type="password" id="sitePassword" placeholder="Enter a secure password">
+          <label class="form-label" for="sitePassword">🔑 Password</label>
+          <input type="password" id="sitePassword" class="form-input" placeholder="Enter a secure password">
         </div>
         
-        <button class="btn btn-primary" id="addSiteBtn">Add Protected Site</button>
-        <button class="btn btn-secondary" id="addCurrentSiteBtn">Add Current Site</button>
+        <button class="btn btn-primary" id="addSiteBtn">✨ Add Protected Site</button>
+        <button class="btn btn-secondary" id="addCurrentSiteBtn">📌 Add Current Site</button>
       </div>
       
       <div id="statsTab" class="tab-content hidden">
@@ -320,7 +534,7 @@
           </div>
         </div>
         
-        <button class="btn btn-secondary" id="openDashboardBtn">📊 Open Full Analytics</button>
+        <button class="btn btn-primary" id="openDashboardBtn">📊 Open Full Analytics</button>
         <button class="btn btn-secondary" id="openSettingsBtn">⚙️ Open Settings</button>
       </div>
     </div>
