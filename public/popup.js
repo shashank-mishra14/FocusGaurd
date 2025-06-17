@@ -10,9 +10,12 @@ function setupEventListeners() {
   // Time limit slider
   const timeLimitSlider = document.getElementById('timeLimit');
   const timeLimitValue = document.getElementById('timeLimitValue');
+  const timeLimitDisplay = document.getElementById('timeLimitDisplay');
   
   timeLimitSlider.addEventListener('input', (e) => {
-    timeLimitValue.textContent = e.target.value;
+    const value = e.target.value;
+    timeLimitValue.textContent = value;
+    timeLimitDisplay.textContent = `${value} minutes`;
   });
   
   // Password protection checkbox
@@ -28,7 +31,7 @@ function setupEventListeners() {
   });
 
   // Tab switching event listeners
-  document.querySelectorAll('.nav-tab').forEach(tab => {
+  document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
       const targetTab = e.target.dataset.tab;
       if (targetTab) {
@@ -40,9 +43,6 @@ function setupEventListeners() {
   // Button event listeners
   document.getElementById('addSiteBtn').addEventListener('click', addSite);
   document.getElementById('addCurrentSiteBtn').addEventListener('click', addCurrentSite);
-  document.getElementById('settingsBtn').addEventListener('click', openSettings);
-  document.getElementById('openDashboardBtn').addEventListener('click', openDashboard);
-  document.getElementById('openSettingsBtn').addEventListener('click', openSettings);
 }
 
 async function loadCurrentSite() {
@@ -93,17 +93,49 @@ async function loadProtectedSites() {
     siteList.innerHTML = '';
     sites.forEach(site => {
       const siteElement = document.createElement('div');
-      siteElement.className = 'site-item';
+      siteElement.className = 'site-card';
       
       const hasPassword = site.password ? '🔒' : '';
-      const timeLimit = site.timeLimit ? `${site.timeLimit}m limit` : 'No time limit';
+      const timeLimit = site.timeLimit || 0;
+      const timeUsed = 0; // TODO: Get from analytics
+      const isOverLimit = timeUsed >= timeLimit;
+      
+      if (isOverLimit) {
+        siteElement.classList.add('blocked');
+      }
+      
+      const progressPercent = timeLimit > 0 ? Math.min((timeUsed / timeLimit) * 100, 100) : 0;
       
       siteElement.innerHTML = `
-        <div class="site-info">
-          <div class="site-domain">${hasPassword} ${site.domain}</div>
-          <div class="site-details">${timeLimit}</div>
+        <div class="site-header">
+          <div class="site-info">
+            <div class="site-name">
+              ${hasPassword} ${site.domain}
+              ${isOverLimit ? '<span style="color: #ef4444;">🚫</span>' : '<span style="color: #10b981;">✅</span>'}
+            </div>
+            <div class="site-time">
+              <span>⏰</span>
+              ${timeUsed}m / ${timeLimit}m
+            </div>
+          </div>
+          <div class="site-actions">
+            <button class="action-btn edit-btn" title="Edit">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button class="action-btn remove-btn" data-domain="${site.domain}" title="Remove">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3,6 5,6 21,6"/>
+                <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <button class="remove-btn" data-domain="${site.domain}">Remove</button>
+        <div class="site-progress">
+          <div class="site-progress-fill ${isOverLimit ? 'over-limit' : ''}" style="width: ${progressPercent}%"></div>
+        </div>
       `;
       
       // Add event listener to the remove button
@@ -130,15 +162,33 @@ async function loadStats() {
     // Calculate today's total time
     const today = new Date().toDateString();
     let todayTotal = 0;
+    let sitesVisitedToday = 0;
     
     if (timeTrackingData) {
       Object.values(timeTrackingData).forEach(siteData => {
-        todayTotal += siteData[today] || 0;
+        const dayTime = siteData[today] || 0;
+        todayTotal += dayTime;
+        if (dayTime > 0) sitesVisitedToday++;
       });
     }
     
     const todayMinutes = Math.floor(todayTotal / 60000);
+    const dailyLimit = 240; // 4 hours
+    const progressPercent = Math.min((todayMinutes / dailyLimit) * 100, 100);
+    
+    // Update UI elements
     document.getElementById('todayTime').textContent = formatTime(todayMinutes);
+    document.getElementById('todayUsage').textContent = formatTime(todayMinutes);
+    document.getElementById('sitesVisited').textContent = `${sitesVisitedToday} sites visited`;
+    document.getElementById('timeRemaining').textContent = `${Math.max(0, dailyLimit - todayMinutes)}m remaining`;
+    
+    // Update progress bar
+    const progressBar = document.getElementById('dailyProgress');
+    if (progressBar) {
+      setTimeout(() => {
+        progressBar.style.width = `${progressPercent}%`;
+      }, 500);
+    }
     
   } catch (error) {
     console.error('Error loading stats:', error);
@@ -239,20 +289,20 @@ async function addCurrentSite() {
 }
 
 function showTab(tabName, clickedElement = null) {
-  // Hide all tabs
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.classList.add('hidden');
+  // Hide all tab panels
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.remove('active');
   });
   
   // Remove active class from all tab buttons
-  document.querySelectorAll('.nav-tab').forEach(tab => {
+  document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.remove('active');
   });
   
-  // Show selected tab
+  // Show selected tab panel
   const targetTab = document.getElementById(tabName + 'Tab');
   if (targetTab) {
-    targetTab.classList.remove('hidden');
+    targetTab.classList.add('active');
   }
   
   // Add active class to clicked tab button
@@ -260,7 +310,7 @@ function showTab(tabName, clickedElement = null) {
     clickedElement.classList.add('active');
   } else {
     // Fallback: find the tab button by data attribute
-    document.querySelectorAll('.nav-tab').forEach(tab => {
+    document.querySelectorAll('.tab').forEach(tab => {
       if (tab.dataset.tab === tabName) {
         tab.classList.add('active');
       }

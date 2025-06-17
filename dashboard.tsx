@@ -149,15 +149,28 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     }
   }
 
-  // Enhanced Data Sets
-  const dailyUsageData = [
-    { day: "Mon", minutes: 180, productive: 120, distracted: 60, focus: 67 },
-    { day: "Tue", minutes: 220, productive: 140, distracted: 80, focus: 64 },
-    { day: "Wed", minutes: 150, productive: 110, distracted: 40, focus: 73 },
-    { day: "Thu", minutes: 280, productive: 160, distracted: 120, focus: 57 },
-    { day: "Fri", minutes: 190, productive: 130, distracted: 60, focus: 68 },
-    { day: "Sat", minutes: 320, productive: 180, distracted: 140, focus: 56 },
-    { day: "Sun", minutes: 240, productive: 160, distracted: 80, focus: 67 },
+  // Process real data or use fallback
+  const dailyUsageData = analyticsData?.dailyTotals?.map((day: { date: string; totalTime: number }) => {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const date = new Date(day.date);
+    const dayName = dayNames[date.getDay()];
+    const minutes = Math.floor(day.totalTime / 60); // Convert seconds to minutes
+    
+    return {
+      day: dayName,
+      minutes: minutes,
+      productive: Math.floor(minutes * 0.6), // Estimate 60% productive
+      distracted: Math.floor(minutes * 0.4), // Estimate 40% distracted
+      focus: Math.max(20, 100 - Math.floor(minutes / 5)) // Focus score based on usage
+    };
+  }) || [
+    { day: "Mon", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Tue", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Wed", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Thu", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Fri", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Sat", minutes: 0, productive: 0, distracted: 0, focus: 100 },
+    { day: "Sun", minutes: 0, productive: 0, distracted: 0, focus: 100 },
   ]
 
   const hourlyData = [
@@ -205,79 +218,63 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     { category: "Other", time: 60, percentage: 5, color: "#6B7280" },
   ]
 
-  const detailedSiteData = [
-    {
-      site: "youtube.com",
-      timeSpent: "8h 12m",
-      visits: 45,
-      avgSession: "11m",
-      status: "Over Limit",
-      trend: "up",
-      category: "Entertainment",
-      productivity: 25,
-      blocked: 12,
-    },
-    {
-      site: "github.com",
-      timeSpent: "6h 20m",
-      visits: 28,
-      avgSession: "14m",
-      status: "Productive",
-      trend: "up",
-      category: "Work",
-      productivity: 95,
+  const detailedSiteData = analyticsData?.siteTotals?.map((site: { domain: string; totalTime: number; totalVisits: number }) => {
+    const hours = Math.floor(site.totalTime / 3600);
+    const minutes = Math.floor((site.totalTime % 3600) / 60);
+    const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    const avgSession = site.totalVisits > 0 ? `${Math.floor(site.totalTime / site.totalVisits / 60)}m` : "0m";
+    
+    // Categorize sites
+    const getCategory = (domain: string) => {
+      if (domain.includes('github') || domain.includes('stackoverflow')) return 'Work';
+      if (domain.includes('facebook') || domain.includes('twitter') || domain.includes('instagram')) return 'Social';
+      if (domain.includes('youtube') || domain.includes('netflix') || domain.includes('twitch')) return 'Entertainment';
+      if (domain.includes('linkedin')) return 'Professional';
+      if (domain.includes('reddit') || domain.includes('news')) return 'News';
+      return 'Other';
+    };
+    
+    const category = getCategory(site.domain);
+    const productivity = category === 'Work' ? 90 : category === 'Professional' ? 75 : category === 'Social' ? 30 : 40;
+    
+    return {
+      site: site.domain,
+      timeSpent,
+      visits: site.totalVisits,
+      avgSession,
+      status: site.totalTime > 14400 ? "Over Limit" : "Within Limit", // 4 hours = 14400 seconds
+      trend: "stable",
+      category,
+      productivity,
       blocked: 0,
-    },
+    };
+  }) || [
     {
-      site: "facebook.com",
-      timeSpent: "5h 20m",
-      visits: 32,
-      avgSession: "10m",
-      status: "Within Limit",
-      trend: "down",
-      category: "Social",
-      productivity: 30,
-      blocked: 8,
-    },
-    {
-      site: "twitter.com",
-      timeSpent: "3h 8m",
-      visits: 28,
-      avgSession: "7m",
-      status: "Within Limit",
-      trend: "up",
-      category: "Social",
-      productivity: 35,
-      blocked: 5,
-    },
-    {
-      site: "linkedin.com",
-      timeSpent: "2h 45m",
-      visits: 15,
-      avgSession: "11m",
-      status: "Productive",
-      trend: "up",
-      category: "Professional",
-      productivity: 85,
+      site: "No data available",
+      timeSpent: "0m",
+      visits: 0,
+      avgSession: "0m",
+      status: "No Activity",
+      trend: "stable",
+      category: "None",
+      productivity: 0,
       blocked: 0,
-    },
-    {
-      site: "reddit.com",
-      timeSpent: "2h 30m",
-      visits: 15,
-      avgSession: "10m",
-      status: "Within Limit",
-      trend: "down",
-      category: "News",
-      productivity: 40,
-      blocked: 3,
     },
   ]
+
+  // Calculate overview stats from real data
+  const totalTime = analyticsData?.dailyTotals?.reduce((sum: number, day: { totalTime: number }) => sum + day.totalTime, 0) || 0;
+  const totalHours = Math.floor(totalTime / 3600);
+  const totalMinutes = Math.floor((totalTime % 3600) / 60);
+  const totalTimeFormatted = totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`;
+  
+  const totalSites = analyticsData?.siteTotals?.length || 0;
+  const totalVisits = analyticsData?.dailyTotals?.reduce((sum: number, day: { totalVisits: number }) => sum + (day.totalVisits || 0), 0) || 0;
 
   const overviewStats = [
     {
       title: "Total Screen Time",
-      value: "22h 55m",
+      value: totalTimeFormatted,
       change: "-12%",
       changeType: "positive",
       icon: Clock,

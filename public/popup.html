@@ -12,132 +12,239 @@
     }
     
     body {
-      width: 360px;
-      min-height: 540px;
+      width: 380px;
+      min-height: 580px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      background: white;
       color: #1f2937;
       overflow: hidden;
     }
     
-    .glass-container {
-      backdrop-filter: blur(20px);
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    .container {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+      transform: translateY(0);
+      transition: all 0.5s ease;
       height: 100%;
-      position: relative;
     }
     
     .header {
-      padding: 20px;
-      text-align: center;
-      position: relative;
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid #f3f4f6;
+      background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
     }
     
     .logo {
-      font-size: 24px;
-      font-weight: 700;
-      color: white;
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 8px;
-      margin-bottom: 4px;
     }
     
     .logo-icon {
-      width: 28px;
-      height: 28px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
+      width: 20px;
+      height: 20px;
+      color: #3b82f6;
+      animation: pulse 2s ease-in-out infinite;
     }
     
-    .tagline {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 12px;
-      font-weight: 400;
-    }
-    
-    .content {
-      padding: 24px 20px;
-      height: calc(100% - 80px);
-      overflow-y: auto;
-    }
-    
-    .current-site {
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
-      padding: 16px;
-      border-radius: 16px;
-      margin-bottom: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: white;
-      text-align: center;
-    }
-    
-    .current-site strong {
+    .logo-text {
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.95);
+      color: #1f2937;
     }
     
-    .current-time {
-      font-size: 11px;
-      opacity: 0.8;
-      margin-top: 4px;
+    .header-btn {
+      padding: 6px;
+      border: none;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: #6b7280;
     }
     
-    .nav-tabs {
+    .header-btn:hover {
+      background: rgba(255, 255, 255, 1);
+      color: #374151;
+    }
+    
+    .daily-usage {
+      padding: 16px;
+      border-bottom: 1px solid #f3f4f6;
+      background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    }
+    
+    .usage-stats {
       display: flex;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 14px;
     }
     
-    .nav-tab {
-      flex: 1;
-      padding: 10px 8px;
+    .usage-time {
+      font-weight: 600;
+      color: #1f2937;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+      border-radius: 4px;
+      transition: width 1s ease-out;
+      width: 0%;
+    }
+    
+    .usage-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      margin: 8px;
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    
+    .tab {
+      padding: 8px 12px;
       text-align: center;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       border: none;
       background: none;
-      color: rgba(255, 255, 255, 0.7);
-      border-radius: 8px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
+      color: #6b7280;
+      border-radius: 6px;
+      transition: all 0.3s ease;
     }
     
-    .nav-tab.active {
-      background: rgba(255, 255, 255, 0.25);
-      color: white;
-      backdrop-filter: blur(10px);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-    
-    .nav-tab:hover:not(.active) {
-      background: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.9);
+    .tab.active {
+      background: white;
+      color: #1f2937;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     
     .tab-content {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 16px;
-      padding: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+      padding: 16px;
       min-height: 320px;
+    }
+    
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .tab-panel.active {
+      display: block;
+    }
+    
+    .site-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+      border-left: 4px solid #10b981;
+    }
+    
+    .site-card:hover {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px);
+    }
+    
+    .site-card.blocked {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+    
+    .site-header {
+      display: flex;
+      justify-content: between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .site-info {
+      flex: 1;
+    }
+    
+    .site-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .site-time {
+      font-size: 12px;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    
+    .site-actions {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .action-btn {
+      padding: 4px;
+      border: none;
+      background: #f9fafb;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: #6b7280;
+    }
+    
+    .action-btn:hover {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    
+    .site-progress {
+      width: 100%;
+      height: 4px;
+      background: #f3f4f6;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    
+    .site-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #059669);
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+    
+    .site-progress-fill.over-limit {
+      background: linear-gradient(90deg, #ef4444, #dc2626);
     }
     
     .form-group {
@@ -154,35 +261,27 @@
     
     .form-input {
       width: 100%;
-      padding: 12px 16px;
-      border: 2px solid rgba(107, 126, 234, 0.1);
-      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
       font-size: 14px;
-      background: rgba(255, 255, 255, 0.8);
       transition: all 0.3s ease;
-      backdrop-filter: blur(10px);
     }
     
     .form-input:focus {
       outline: none;
-      border-color: #667eea;
-      background: rgba(255, 255, 255, 0.95);
-      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-      transform: translateY(-1px);
-    }
-    
-    .form-input::placeholder {
-      color: #9ca3af;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
     .slider-container {
-      margin: 16px 0;
+      margin: 12px 0;
     }
     
     .slider-value {
       text-align: center;
       font-weight: 600;
-      color: #667eea;
+      color: #3b82f6;
       margin-bottom: 8px;
       font-size: 16px;
     }
@@ -191,170 +290,74 @@
       width: 100%;
       height: 6px;
       border-radius: 3px;
-      background: linear-gradient(90deg, #667eea, #764ba2);
+      background: #e5e7eb;
       outline: none;
       -webkit-appearance: none;
-      margin: 10px 0;
     }
     
     .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
       appearance: none;
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: white;
+      background: #3b82f6;
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      border: 2px solid #667eea;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
     
     .checkbox-group {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
       margin: 16px 0;
-      padding: 12px;
-      background: rgba(102, 126, 234, 0.05);
-      border-radius: 12px;
-      border: 1px solid rgba(102, 126, 234, 0.1);
     }
     
     .checkbox {
-      width: 18px;
-      height: 18px;
-      accent-color: #667eea;
+      width: 16px;
+      height: 16px;
+      accent-color: #3b82f6;
     }
     
     .checkbox-label {
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
       color: #374151;
     }
     
     .btn {
       width: 100%;
-      padding: 14px 20px;
+      padding: 10px 16px;
       border: none;
-      border-radius: 12px;
+      border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-      transition: left 0.5s;
-    }
-    
-    .btn:hover::before {
-      left: 100%;
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-    }
-    
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-    }
-    
-    .btn-secondary {
-      background: rgba(107, 114, 128, 0.1);
-      color: #374151;
-      border: 1px solid rgba(107, 114, 128, 0.2);
-      margin-top: 8px;
-    }
-    
-    .btn-secondary:hover {
-      background: rgba(107, 114, 128, 0.15);
-      transform: translateY(-1px);
-    }
-    
-    .site-list {
-      max-height: 240px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-    
-    .site-list::-webkit-scrollbar {
-      width: 4px;
-    }
-    
-    .site-list::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 2px;
-    }
-    
-    .site-list::-webkit-scrollbar-thumb {
-      background: rgba(102, 126, 234, 0.3);
-      border-radius: 2px;
-    }
-    
-    .site-item {
-      background: rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       transition: all 0.3s ease;
-    }
-    
-    .site-item:hover {
-      background: rgba(255, 255, 255, 0.8);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    }
-    
-    .site-info {
-      flex: 1;
-    }
-    
-    .site-domain {
-      font-weight: 600;
-      font-size: 14px;
-      color: #1f2937;
+      margin-bottom: 8px;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
     }
     
-    .site-details {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 4px;
-    }
-    
-    .remove-btn {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
       color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
     }
     
-    .remove-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn-secondary {
+      background: #f9fafb;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+    }
+    
+    .btn-secondary:hover {
+      background: #f3f4f6;
     }
     
     .stats-grid {
@@ -365,31 +368,62 @@
     }
     
     .stat-card {
-      background: rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(10px);
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
       padding: 16px;
       border-radius: 12px;
       text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      transition: all 0.3s ease;
-    }
-    
-    .stat-card:hover {
-      background: rgba(255, 255, 255, 0.8);
-      transform: translateY(-2px);
+      border: 1px solid #e0f2fe;
     }
     
     .stat-value {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
-      color: #667eea;
+      color: #0369a1;
       margin-bottom: 4px;
     }
     
     .stat-label {
-      font-size: 11px;
+      font-size: 12px;
       color: #6b7280;
       font-weight: 500;
+    }
+    
+    .quick-access {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+    }
+    
+    .quick-access-title {
+      text-align: center;
+      margin-bottom: 12px;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .alert {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .alert-error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    
+    .alert-success {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    
+    .hidden {
+      display: none !important;
     }
     
     .empty-state {
@@ -416,73 +450,67 @@
       opacity: 0.8;
     }
     
-    .alert {
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      font-weight: 500;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     
-    .alert-error {
-      background: rgba(254, 226, 226, 0.9);
-      color: #991b1b;
-      border: 1px solid rgba(254, 202, 202, 0.5);
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
     }
     
-    .alert-success {
-      background: rgba(209, 250, 229, 0.9);
-      color: #065f46;
-      border: 1px solid rgba(167, 243, 208, 0.5);
-    }
-    
-    .hidden {
-      display: none !important;
-    }
-    
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .tab-content {
-      animation: slideIn 0.3s ease-out;
+    .animate-pulse {
+      animation: pulse 2s ease-in-out infinite;
     }
   </style>
 </head>
 <body>
-  <div class="glass-container">
+  <div class="container">
+    <!-- Header -->
     <div class="header">
       <div class="logo">
         <div class="logo-icon">🛡️</div>
-        <span>Protekt</span>
+        <span class="logo-text">Protekt</span>
       </div>
-      <div class="tagline">Stay focused, stay protected</div>
+      <button class="header-btn" onclick="openDashboard()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9,22 9,12 15,12 15,22"/>
+        </svg>
+      </button>
     </div>
-    
-    <div class="content">
-      <div id="currentSite" class="current-site hidden">
-        <div>📍 <strong id="currentDomain"></strong></div>
-        <div id="currentTime" class="current-time"></div>
+
+    <!-- Daily Usage Summary -->
+    <div class="daily-usage">
+      <div class="usage-stats">
+        <span class="usage-time">Today's Usage: <span id="todayUsage">0m</span> / 240m</span>
       </div>
-      
-      <div id="errorMessage" class="alert alert-error hidden"></div>
-      <div id="successMessage" class="alert alert-success hidden"></div>
-      
-      <div class="nav-tabs">
-        <button class="nav-tab active" data-tab="sites">🏠 Sites</button>
-        <button class="nav-tab" data-tab="add">➕ Add</button>
-        <button class="nav-tab" data-tab="stats">📊 Stats</button>
+      <div class="progress-bar">
+        <div class="progress-fill" id="dailyProgress"></div>
       </div>
-      
-      <div id="sitesTab" class="tab-content">
-        <div class="site-list" id="siteList">
+      <div class="usage-details">
+        <span id="sitesVisited">0 sites visited</span>
+        <span id="timeRemaining">240m remaining</span>
+      </div>
+    </div>
+
+    <!-- Error/Success Messages -->
+    <div id="errorMessage" class="alert alert-error hidden"></div>
+    <div id="successMessage" class="alert alert-success hidden"></div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="sites">Protected Sites</button>
+      <button class="tab" data-tab="add">Add Site</button>
+      <button class="tab" data-tab="analytics">Analytics</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Protected Sites Tab -->
+      <div id="sitesTab" class="tab-panel active">
+        <div id="siteList">
           <div class="empty-state">
             <div class="empty-icon">🔒</div>
             <div class="empty-title">No protected sites yet</div>
@@ -490,21 +518,19 @@
           </div>
         </div>
       </div>
-      
-      <div id="addTab" class="tab-content hidden">
+
+      <!-- Add Site Tab -->
+      <div id="addTab" class="tab-panel">
         <div class="form-group">
-          <label class="form-label" for="siteUrl">🌐 Website URL</label>
+          <label class="form-label" for="siteUrl">Website URL</label>
           <input type="text" id="siteUrl" class="form-input" placeholder="e.g., facebook.com">
         </div>
         
         <div class="form-group">
-          <label class="form-label">⏱️ Daily Time Limit: <span id="timeLimitValue">60</span> minutes</label>
+          <label class="form-label">Daily Time Limit: <span id="timeLimitValue">60</span> minutes</label>
           <div class="slider-container">
+            <div class="slider-value" id="timeLimitDisplay">60 minutes</div>
             <input type="range" id="timeLimit" class="slider" min="5" max="240" value="60" step="5">
-            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; margin-top: 4px;">
-              <span>5 min</span>
-              <span>4 hours</span>
-            </div>
           </div>
         </div>
         
@@ -514,15 +540,22 @@
         </div>
         
         <div id="passwordGroup" class="form-group hidden">
-          <label class="form-label" for="sitePassword">🔑 Password</label>
+          <label class="form-label" for="sitePassword">Password</label>
           <input type="password" id="sitePassword" class="form-input" placeholder="Enter a secure password">
         </div>
         
-        <button class="btn btn-primary" id="addSiteBtn">✨ Add Protected Site</button>
-        <button class="btn btn-secondary" id="addCurrentSiteBtn">📌 Add Current Site</button>
+        <button class="btn btn-primary" id="addSiteBtn">
+          <span>✨</span>
+          Add Protected Site
+        </button>
+        <button class="btn btn-secondary" id="addCurrentSiteBtn">
+          <span>📌</span>
+          Add Current Site
+        </button>
       </div>
-      
-      <div id="statsTab" class="tab-content hidden">
+
+      <!-- Analytics Tab -->
+      <div id="analyticsTab" class="tab-panel">
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-value" id="totalSites">0</div>
@@ -534,18 +567,26 @@
           </div>
         </div>
         
-        <button class="btn btn-primary" id="openDashboardBtn">📊 Open Dashboard</button>
-        <button class="btn btn-secondary" id="openSettingsBtn">⚙️ Settings</button>
+        <button class="btn btn-primary" onclick="openDashboard()">
+          <span>📊</span>
+          Open Full Dashboard
+        </button>
+        <button class="btn btn-secondary" onclick="openSettings()">
+          <span>⚙️</span>
+          Settings
+        </button>
         
-        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2);">
-          <div style="text-align: center; margin-bottom: 12px; color: rgba(255,255,255,0.8); font-size: 12px;">Quick Access</div>
-          <button class="btn btn-primary" onclick="openDashboard()" style="width: 100%; margin-bottom: 8px;">🏠 Dashboard</button>
+        <div class="quick-access">
+          <div class="quick-access-title">Quick Access</div>
+          <button class="btn btn-primary" onclick="openDashboard()">
+            <span>🏠</span>
+            Dashboard
+          </button>
         </div>
       </div>
     </div>
   </div>
-  
+
   <script src="popup.js"></script>
-  <script src="debug.js"></script>
 </body>
 </html> 
