@@ -317,6 +317,8 @@ class BackgroundService {
   }
 
   async handleMessage(request, sender, sendResponse) {
+    console.log('Handling message:', request.action);
+    
     try {
       switch (request.action) {
         case 'addProtectedSite':
@@ -333,7 +335,7 @@ class BackgroundService {
           const isValid = await this.verifyPassword(request.domain, request.password);
           if (isValid) {
             await this.handleSuccessfulPasswordVerification(request.domain);
-            sendResponse({ success: true });
+            sendResponse({ success: true, action: 'passwordVerified' });
           } else {
             await this.handleFailedPasswordVerification();
             sendResponse({ success: false, error: 'Invalid password' });
@@ -341,8 +343,14 @@ class BackgroundService {
           break;
           
         case 'getAnalytics':
-          const analytics = await this.getAnalytics(request.period || 7);
+          const analytics = await this.getAnalytics(request.period);
           sendResponse({ success: true, data: analytics });
+          break;
+
+        // NEW: Handle backend sync request
+        case 'syncWithBackend':
+          await this.syncProtectedSitesWithBackend();
+          sendResponse({ success: true, message: 'Backend sync initiated' });
           break;
           
         default:
@@ -355,19 +363,67 @@ class BackgroundService {
   }
 
   async addProtectedSite(siteData) {
-    const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
-    const sites = protectedSites || [];
-    
-    const newSite = {
-      id: Date.now().toString(),
-      domain: siteData.domain,
-      password: siteData.password ? await this.hashPassword(siteData.password) : null,
-      timeLimit: siteData.timeLimit || null,
-      createdAt: Date.now()
-    };
-    
-    sites.push(newSite);
-    await chrome.storage.local.set({ protectedSites: sites });
+    try {
+      const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
+      const sites = protectedSites || [];
+      
+      // Check if site already exists
+      const existingIndex = sites.findIndex(site => site.domain === siteData.domain);
+      
+      if (existingIndex !== -1) {
+        // Update existing site
+        sites[existingIndex] = { ...sites[existingIndex], ...siteData };
+      } else {
+        // Add new site
+        sites.push({
+          domain: siteData.domain,
+          timeLimit: siteData.timeLimit || 0,
+          password: siteData.password ? await this.hashPassword(siteData.password) : undefined
+        });
+      }
+      
+      await chrome.storage.local.set({ protectedSites: sites });
+      
+      // NEW: Sync with backend
+      await this.syncProtectedSiteWithBackend(siteData);
+      
+      console.log('Protected site added:', siteData.domain);
+    } catch (error) {
+      console.error('Error adding protected site:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Sync individual protected site with backend
+  async syncProtectedSiteWithBackend(siteData) {
+    try {
+      const { sessionToken } = await chrome.storage.local.get(['sessionToken']);
+      if (!sessionToken) {
+        console.log('No session token available for syncing protected site');
+        return;
+      }
+      
+      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${sessionToken}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain: siteData.domain,
+          timeLimit: siteData.timeLimit,
+          password: siteData.password,
+          passwordProtected: !!siteData.password
+        })
+      });
+      
+      if (response.ok) {
+        console.log('Protected site synced with backend:', siteData.domain);
+      } else {
+        console.log('Failed to sync protected site with backend:', response.status);
+      }
+    } catch (error) {
+      console.error('Error syncing protected site with backend:', error);
+    }
   }
 
   async removeProtectedSite(domain) {
@@ -452,21 +508,128 @@ class BackgroundService {
   }
 
   async updateTimeSpent(domain, timeSpent) {
-    const today = new Date().toDateString();
-    const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
-    const data = timeTrackingData || {};
-    
-    if (!data[domain]) {
-      data[domain] = {};
+    try {
+      const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
+      const today = new Date().toDateString();
+      
+      if (!timeTrackingData[domain]) {
+        timeTrackingData[domain] = {};
+      }
+      
+      if (!timeTrackingData[domain][today]) {
+        timeTrackingData[domain][today] = 0;
+      }
+      
+      timeTrackingData[domain][today] += timeSpent;
+      
+      await chrome.storage.local.set({ timeTrackingData });
+      
+      // NEW: Sync with backend database
+      await this.syncWithBackend(domain, timeSpent, today);
+      
+      console.log('Time tracking updated:', domain, timeSpent);
+    } catch (error) {
+      console.error('Error updating time spent:', error);
     }
-    
-    if (!data[domain][today]) {
-      data[domain][today] = 0;
+  }
+
+  // NEW: Backend synchronization method
+  async syncWithBackend(domain, timeSpent, date) {
+    try {
+      // Try to get session token from storage
+      const { sessionToken, tokenExpiry } = await chrome.storage.local.get(['sessionToken', 'tokenExpiry']);
+      
+      let validToken = sessionToken;
+      
+      // Check if token is expired or missing
+      if (!sessionToken || !tokenExpiry || new Date() > new Date(tokenExpiry)) {
+        console.log('No valid session token, attempting to generate one...');
+        validToken = await this.generateSessionToken();
+      }
+      
+      if (!validToken) {
+        console.log('Unable to sync with backend - no session token available');
+        return;
+      }
+      
+      // Submit analytics data to backend
+      const response = await fetch(`http://localhost:3000/api/analytics?token=${validToken}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain,
+          timeSpent,
+          visits: 1,
+          date: new Date(date).toISOString().split('T')[0] // Convert to YYYY-MM-DD format
+        })
+      });
+      
+      if (response.ok) {
+        console.log('Successfully synced data with backend:', domain, timeSpent);
+      } else {
+        console.log('Failed to sync with backend:', response.status, response.statusText);
+        // If token is invalid, clear it
+        if (response.status === 401) {
+          await chrome.storage.local.remove(['sessionToken', 'tokenExpiry']);
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing with backend:', error);
     }
-    
-    data[domain][today] += timeSpent;
-    
-    await chrome.storage.local.set({ timeTrackingData: data });
+  }
+
+  // NEW: Generate session token for backend communication
+  async generateSessionToken() {
+    try {
+      // This will only work if user has authenticated in the web app
+      const response = await fetch('http://localhost:3000/api/extension/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include' // Include cookies for authentication
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.sessionToken) {
+          // Store token with expiry
+          const expiryDate = new Date(data.expiresAt);
+          await chrome.storage.local.set({
+            sessionToken: data.sessionToken,
+            tokenExpiry: expiryDate.toISOString()
+          });
+          console.log('Session token generated and stored');
+          return data.sessionToken;
+        }
+      } else {
+        console.log('Failed to generate session token:', response.status);
+      }
+    } catch (error) {
+      console.error('Error generating session token:', error);
+    }
+    return null;
+  }
+
+  // NEW: Sync protected sites with backend
+  async syncProtectedSitesWithBackend() {
+    try {
+      const { sessionToken } = await chrome.storage.local.get(['sessionToken']);
+      if (!sessionToken) return;
+      
+      // Get protected sites from backend
+      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${sessionToken}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Update local storage with backend data
+        await chrome.storage.local.set({ protectedSites: data.sites });
+        console.log('Protected sites synced from backend');
+      }
+    } catch (error) {
+      console.error('Error syncing protected sites:', error);
+    }
   }
 
   async getAnalytics(period = 7) {

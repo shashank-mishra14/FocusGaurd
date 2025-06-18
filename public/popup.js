@@ -43,6 +43,30 @@ function setupEventListeners() {
   // Button event listeners
   document.getElementById('addSiteBtn').addEventListener('click', addSite);
   document.getElementById('addCurrentSiteBtn').addEventListener('click', addCurrentSite);
+  
+  // NEW: Initialize backend synchronization
+  initializeBackendSync();
+}
+
+// NEW: Initialize backend synchronization
+async function initializeBackendSync() {
+  try {
+    // Check if we have a valid session and sync data
+    const { sessionToken, tokenExpiry } = await chrome.storage.local.get(['sessionToken', 'tokenExpiry']);
+    
+    if (sessionToken && tokenExpiry && new Date() < new Date(tokenExpiry)) {
+      console.log('Valid session found, syncing with backend...');
+      
+      // Send message to background script to sync data
+      chrome.runtime.sendMessage({
+        action: 'syncWithBackend'
+      });
+    } else {
+      console.log('No valid session for backend sync');
+    }
+  } catch (error) {
+    console.error('Error initializing backend sync:', error);
+  }
 }
 
 async function loadCurrentSite() {
@@ -326,32 +350,59 @@ function openSettings() {
 
 async function openDashboard() {
   try {
-    // Try to generate a session token for seamless authentication
-    const response = await fetch('http://localhost:3000/api/extension/session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'generate',
-        extensionId: chrome.runtime.id
-      })
-    });
+    // First, try to get existing session token
+    const { sessionToken, tokenExpiry } = await chrome.storage.local.get(['sessionToken', 'tokenExpiry']);
     
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.token) {
-        // Open dashboard with session token
-        chrome.tabs.create({ 
-          url: `http://localhost:3000/extension-popup?token=${data.token}&redirect=dashboard` 
+    let validToken = sessionToken;
+    
+    // Check if token is expired or missing
+    if (!sessionToken || !tokenExpiry || new Date() > new Date(tokenExpiry)) {
+      console.log('No valid session token, attempting to generate one...');
+      
+      // Try to generate a new session token
+      try {
+        const response = await fetch('http://localhost:3000/api/extension/session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include' // Include cookies for authentication
         });
-      } else {
-        // Fallback to regular dashboard
-        chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.sessionToken) {
+            // Store token with expiry
+            const expiryDate = new Date(data.expiresAt);
+            await chrome.storage.local.set({
+              sessionToken: data.sessionToken,
+              tokenExpiry: expiryDate.toISOString()
+            });
+            validToken = data.sessionToken;
+            console.log('New session token generated');
+          }
+        } else {
+          console.log('Failed to generate session token:', response.status);
+          validToken = null;
+        }
+      } catch (error) {
+        console.error('Error generating session token:', error);
+        validToken = null;
       }
+    }
+    
+    if (validToken) {
+      // Open dashboard with session token for seamless authentication
+      chrome.tabs.create({ 
+        url: `http://localhost:3000/dashboard?token=${validToken}` 
+      });
+      console.log('Opening dashboard with session token');
     } else {
-      // Fallback to regular dashboard
-      chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+      // No token available - redirect to sign-in first
+      chrome.tabs.create({ 
+        url: 'http://localhost:3000/sign-in?redirect_url=/dashboard' 
+      });
+      console.log('No session token available, redirecting to sign-in');
     }
   } catch (error) {
     console.error('Error opening dashboard:', error);
