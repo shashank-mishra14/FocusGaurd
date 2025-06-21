@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test FocusGuard Popup</title>
+  <style>
+    body {
+      width: 360px;
+      height: 520px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .test-section {
+      margin-bottom: 20px;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    
+    .test-button {
+      padding: 10px 16px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    
+    .test-button:hover {
+      background: #5b5bd6;
+    }
+    
+    .console-output {
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      margin-top: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>🛡️ FocusGuard Test</h2>
+  
+  <div class="test-section">
+    <h3>Button Tests</h3>
+    <button class="test-button" onclick="testOpenDashboard()">Test Dashboard</button>
+    <button class="test-button" onclick="testShowModal()">Test Modal</button>
+    <button class="test-button" onclick="testConfirmAdd()">Test Confirm Add</button>
+    <button class="test-button" onclick="testCloseModal()">Test Close Modal</button>
+    
+    <div class="console-output" id="testOutput">
+      Console output will appear here...
+    </div>
+  </div>
+  
+  <!-- Simplified Modal for Testing -->
+  <div id="testModal" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  ">
+    <div style="
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 300px;
+    ">
+      <h3>Test Modal</h3>
+      <p>This is a test modal to verify functionality.</p>
+      <button onclick="closeTestModal()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // Mock Chrome APIs for testing
+    window.chrome = window.chrome || {
+      storage: {
+        local: {
+          get: () => Promise.resolve({}),
+          set: () => Promise.resolve()
+        }
+      },
+      tabs: {
+        query: () => Promise.resolve([{ url: 'https://example.com' }]),
+        create: (options) => {
+          log('Would open tab: ' + options.url);
+          window.open(options.url, '_blank');
+        }
+      },
+      runtime: {
+        sendMessage: () => Promise.resolve({ success: true })
+      }
+    };
+    
+    // Logging function
+    function log(message) {
+      const output = document.getElementById('testOutput');
+      const timestamp = new Date().toLocaleTimeString();
+      output.innerHTML += `[${timestamp}] ${message}<br>`;
+      output.scrollTop = output.scrollHeight;
+      console.log(message);
+    }
+    
+    // Test functions
+    function testOpenDashboard() {
+      log('Testing openDashboard function...');
+      if (typeof openDashboard === 'function') {
+        openDashboard();
+        log('✅ openDashboard function called successfully');
+      } else {
+        log('❌ openDashboard function not found');
+      }
+    }
+    
+    function testShowModal() {
+      log('Testing modal show...');
+      const modal = document.getElementById('testModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        log('✅ Test modal shown');
+      } else {
+        log('❌ Test modal not found');
+      }
+    }
+    
+    function closeTestModal() {
+      log('Closing test modal...');
+      const modal = document.getElementById('testModal');
+      if (modal) {
+        modal.style.display = 'none';
+        log('✅ Test modal closed');
+      }
+    }
+    
+    function testConfirmAdd() {
+      log('Testing confirmAddSite function...');
+      if (typeof confirmAddSite === 'function') {
+        log('⚠️ confirmAddSite function found but requires form elements');
+      } else {
+        log('❌ confirmAddSite function not found');
+      }
+    }
+    
+    function testCloseModal() {
+      log('Testing closeAddSiteModal function...');
+      if (typeof closeAddSiteModal === 'function') {
+        closeAddSiteModal();
+        log('✅ closeAddSiteModal function called');
+      } else {
+        log('❌ closeAddSiteModal function not found');
+      }
+    }
+    
+    // Load the popup script
+    log('Loading popup.js...');
+  </script>
+  
+  <!-- Load the actual popup script -->
+  <script src="popup.js"></script>
+  
+  <script>
+    // Test after script loads
+    setTimeout(() => {
+      log('Popup script loaded. Testing function availability...');
+      log('openDashboard: ' + (typeof openDashboard !== 'undefined' ? '✅ Available' : '❌ Missing'));
+      log('closeAddSiteModal: ' + (typeof closeAddSiteModal !== 'undefined' ? '✅ Available' : '❌ Missing'));
+      log('confirmAddSite: ' + (typeof confirmAddSite !== 'undefined' ? '✅ Available' : '❌ Missing'));
+    }, 1000);
+  </script>
+</body>
+</html> 
