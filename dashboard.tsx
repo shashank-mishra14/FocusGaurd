@@ -126,6 +126,14 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     loadAnalyticsData()
   }, [sessionToken, timePeriod])
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Dashboard props:', { sessionToken });
+    console.log('Analytics data:', analyticsData);
+    console.log('Loading:', loading);
+    console.log('Error:', error);
+  }, [sessionToken, analyticsData, loading, error])
+
   const loadAnalyticsData = async () => {
     try {
       setLoading(true)
@@ -271,6 +279,9 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   const totalSites = analyticsData?.siteTotals?.length || 0;
   const totalVisits = analyticsData?.dailyTotals?.reduce((sum: number, day: { totalVisits: number }) => sum + (day.totalVisits || 0), 0) || 0;
 
+  // Calculate real stats from analytics data
+  const avgFocusScore = dailyUsageData.reduce((sum, day) => sum + day.focus, 0) / dailyUsageData.length;
+
   const overviewStats = [
     {
       title: "Total Screen Time",
@@ -284,7 +295,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     },
     {
       title: "Focus Score",
-      value: "78%",
+      value: `${Math.round(avgFocusScore)}%`,
       change: "+5%",
       changeType: "positive",
       icon: Brain,
@@ -293,24 +304,24 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
       description: "Productivity index",
     },
     {
-      title: "Sites Blocked",
-      value: "28",
-      change: "+12",
+      title: "Sites Tracked",
+      value: totalSites.toString(),
+      change: `+${totalSites}`,
       changeType: "positive",
       icon: Shield,
       color: "text-green-600",
       bgColor: "bg-green-50",
-      description: "This week",
+      description: "Protected sites",
     },
     {
-      title: "Streak Days",
-      value: "12",
-      change: "+3",
+      title: "Total Visits",
+      value: totalVisits.toString(),
+      change: `+${totalVisits}`,
       changeType: "positive",
       icon: Flame,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
-      description: "Current streak",
+      description: "This period",
     },
   ]
 

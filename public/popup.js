@@ -1,6 +1,7 @@
 // FocusGuard Extension Popup Script
 let extensionToken = null;
 let currentUser = null;
+let isPolling = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('FocusGuard popup initializing...');
@@ -38,7 +39,12 @@ async function checkAuthentication() {
     extensionToken = result.extensionToken;
     currentUser = result.currentUser;
     
-    console.log('Checking authentication...', { hasToken: !!extensionToken, currentUser });
+    console.log('Checking authentication...', { 
+      hasToken: !!extensionToken, 
+      tokenLength: extensionToken?.length,
+      currentUser,
+      extensionToken 
+    });
     
     // Check for token in localStorage (from web page)
     if (!extensionToken) {
@@ -47,16 +53,21 @@ async function checkAuthentication() {
     
     if (extensionToken) {
       // Validate token
+      console.log('Validating token with server...');
       const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
       const data = await response.json();
+      
+      console.log('Token validation response:', data);
       
       if (data.valid) {
         currentUser = data.user;
         await chrome.storage.local.set({ currentUser });
+        console.log('Authentication successful, showing authenticated state');
         showAuthenticatedState();
         return true;
       } else {
         // Token is invalid, clear it
+        console.log('Token invalid, clearing storage');
         await chrome.storage.local.remove(['extensionToken', 'currentUser']);
         extensionToken = null;
         currentUser = null;
@@ -187,27 +198,42 @@ async function handleLogin() {
 }
 
 function startAuthPolling() {
+  // Prevent multiple polling instances
+  if (isPolling) {
+    console.log('Authentication polling already in progress');
+    return;
+  }
+  
+  isPolling = true;
   console.log('Starting authentication polling...');
+  
+  let pollCount = 0;
+  const maxPolls = 60; // Maximum 60 polls (2 minutes)
   
   // Poll every 2 seconds for authentication
   const pollInterval = setInterval(async () => {
-    console.log('Checking for authentication...');
+    pollCount++;
+    console.log(`Checking for authentication... (${pollCount}/${maxPolls})`);
+    
     const authenticated = await checkForWebPageToken();
     
     if (authenticated) {
       console.log('Authentication detected! Updating UI...');
       clearInterval(pollInterval);
+      isPolling = false;
       
       // Re-check authentication to update the UI
       await checkAuthentication();
+      return;
+    }
+    
+    // Stop polling after max attempts
+    if (pollCount >= maxPolls) {
+      clearInterval(pollInterval);
+      isPolling = false;
+      console.log('Authentication polling stopped - max attempts reached');
     }
   }, 2000);
-  
-  // Stop polling after 5 minutes
-  setTimeout(() => {
-    clearInterval(pollInterval);
-    console.log('Authentication polling stopped');
-  }, 5 * 60 * 1000);
 }
 
 // Setup token listener for direct messaging
@@ -226,6 +252,19 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 });
+
+// Manual token injection for debugging
+async function injectTokenManually() {
+  const token = 'f961d14d4ed543d90a638b059ed12892c1e494badbf5f1193ca786e702a69105';
+  console.log('Manually injecting token for debugging...');
+  extensionToken = token;
+  await chrome.storage.local.set({ extensionToken: token });
+  await checkAuthentication();
+  await syncProtectedSitesFromBackend();
+}
+
+// Add a debug button (temporary)
+window.debugInjectToken = injectTokenManually;
 
 async function handleLogout() {
   try {
