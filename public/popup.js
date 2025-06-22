@@ -45,6 +45,7 @@ function setupEventListeners() {
     console.log('Add site button found, attaching listener');
     addCurrentSiteBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       console.log('Add site button clicked');
       showAddSiteModal();
     });
@@ -52,12 +53,26 @@ function setupEventListeners() {
     console.error('Add site button not found!');
   }
   
-  // Dashboard button (backup listener in case onclick doesn't work)
-  const dashboardBtn = document.querySelector('button[onclick="openDashboard()"]');
-  if (dashboardBtn) {
-    dashboardBtn.addEventListener('click', (e) => {
+  // Dashboard button - header button
+  const headerDashboardBtn = document.querySelector('.header-btn');
+  if (headerDashboardBtn) {
+    console.log('Header dashboard button found, attaching listener');
+    headerDashboardBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      console.log('Dashboard button clicked');
+      e.stopPropagation();
+      console.log('Header dashboard button clicked');
+      openDashboard();
+    });
+  }
+
+  // Footer dashboard button
+  const footerDashboardBtn = document.querySelector('.footer-actions .btn-secondary');
+  if (footerDashboardBtn) {
+    console.log('Footer dashboard button found, attaching listener');
+    footerDashboardBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Footer dashboard button clicked');
       openDashboard();
     });
   }
@@ -73,11 +88,80 @@ function setupEventListeners() {
     editPasswordCheckbox.addEventListener('change', toggleEditPasswordField);
   }
   
+  // Modal close buttons
+  const addModalCloseBtn = document.querySelector('#addSiteModal .modal-close');
+  if (addModalCloseBtn) {
+    console.log('Add modal close button found, attaching listener');
+    addModalCloseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Add modal close button clicked');
+      closeAddSiteModal();
+    });
+  }
+
+  const editModalCloseBtn = document.querySelector('#editSiteModal .modal-close');
+  if (editModalCloseBtn) {
+    console.log('Edit modal close button found, attaching listener');
+    editModalCloseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Edit modal close button clicked');
+      closeEditSiteModal();
+    });
+  }
+
+  // Modal action buttons
+  const addModalCancelBtn = document.querySelector('#addSiteModal .btn-modal-secondary');
+  if (addModalCancelBtn) {
+    console.log('Add modal cancel button found, attaching listener');
+    addModalCancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Add modal cancel button clicked');
+      closeAddSiteModal();
+    });
+  }
+
+  const addModalConfirmBtn = document.querySelector('#addSiteModal .btn-modal-primary');
+  if (addModalConfirmBtn) {
+    console.log('Add modal confirm button found, attaching listener');
+    addModalConfirmBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Add modal confirm button clicked');
+      confirmAddSite();
+    });
+  }
+
+  const editModalCancelBtn = document.querySelector('#editSiteModal .btn-modal-secondary');
+  if (editModalCancelBtn) {
+    console.log('Edit modal cancel button found, attaching listener');
+    editModalCancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Edit modal cancel button clicked');
+      closeEditSiteModal();
+    });
+  }
+
+  const editModalConfirmBtn = document.querySelector('#editSiteModal .btn-modal-primary');
+  if (editModalConfirmBtn) {
+    console.log('Edit modal confirm button found, attaching listener');
+    editModalConfirmBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Edit modal confirm button clicked');
+      confirmEditSite();
+    });
+  }
+  
   // Modal overlay click to close
   const addSiteModal = document.getElementById('addSiteModal');
   if (addSiteModal) {
     addSiteModal.addEventListener('click', (e) => {
       if (e.target === addSiteModal) {
+        console.log('Add modal overlay clicked');
         closeAddSiteModal();
       }
     });
@@ -87,10 +171,26 @@ function setupEventListeners() {
   if (editSiteModal) {
     editSiteModal.addEventListener('click', (e) => {
       if (e.target === editSiteModal) {
+        console.log('Edit modal overlay clicked');
         closeEditSiteModal();
       }
     });
   }
+  
+  // Escape key to close modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const addModal = document.getElementById('addSiteModal');
+      const editModal = document.getElementById('editSiteModal');
+      
+      if (addModal && addModal.classList.contains('show')) {
+        closeAddSiteModal();
+      }
+      if (editModal && editModal.classList.contains('show')) {
+        closeEditSiteModal();
+      }
+    }
+  });
   
   console.log('Event listeners setup complete');
   // Initialize backend synchronization
@@ -408,21 +508,38 @@ async function showAddSiteModal() {
     const domainInput = document.getElementById('siteDomain');
     if (domainInput) {
       domainInput.value = domain;
+      domainInput.setAttribute('readonly', 'true');
     }
     
     // Reset form
-    document.getElementById('timeLimit').value = '60';
-    document.getElementById('passwordProtected').checked = false;
-    document.getElementById('sitePassword').value = '';
-    document.getElementById('passwordGroup').classList.add('hidden');
+    const timeLimitInput = document.getElementById('timeLimit');
+    const passwordCheckbox = document.getElementById('passwordProtected');
+    const passwordInput = document.getElementById('sitePassword');
+    const passwordGroup = document.getElementById('passwordGroup');
     
-    // Show modal
+    if (timeLimitInput) timeLimitInput.value = '60';
+    if (passwordCheckbox) passwordCheckbox.checked = false;
+    if (passwordInput) passwordInput.value = '';
+    if (passwordGroup) passwordGroup.classList.add('hidden');
+    
+    // Show modal with proper display
     const modal = document.getElementById('addSiteModal');
     if (modal) {
+      console.log('Showing modal with class: show');
       modal.classList.add('show');
-      console.log('Add site modal shown');
+      
+      // Focus on time limit input after a short delay
+      setTimeout(() => {
+        if (timeLimitInput) {
+          timeLimitInput.focus();
+          timeLimitInput.select();
+        }
+      }, 100);
+      
+      console.log('Add site modal shown successfully');
     } else {
       console.error('Add site modal element not found!');
+      showMessage('Failed to find modal element', 'error');
     }
     
   } catch (error) {
@@ -502,11 +619,26 @@ async function confirmAddSite() {
     const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
     const sites = protectedSites || [];
     
+    // Hash password if provided
+    let hashedPassword = '';
+    if (passwordProtected && password) {
+      // Hash the password for security
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     // Create new site object
     const newSite = {
+      id: Date.now().toString(),
       domain: domain,
       timeLimit: timeLimit,
-      password: passwordProtected ? password : '',
+      password: hashedPassword,
+      passwordProtected: passwordProtected,
+      lastAccess: null, // Will be set when password is entered
+      createdAt: Date.now(),
       addedAt: new Date().toISOString()
     };
     
@@ -594,6 +726,7 @@ async function editSite(domain) {
     // Show modal
     const modal = document.getElementById('editSiteModal');
     if (modal) {
+      console.log('Showing edit modal');
       modal.classList.add('show');
     }
     
@@ -604,9 +737,11 @@ async function editSite(domain) {
 }
 
 function closeEditSiteModal() {
+  console.log('Closing edit site modal');
   const modal = document.getElementById('editSiteModal');
   if (modal) {
     modal.classList.remove('show');
+    console.log('Edit site modal closed');
   }
   window.currentEditDomain = null;
 }
@@ -651,11 +786,28 @@ async function confirmEditSite() {
       return;
     }
     
+    // Hash new password if provided
+    let finalPassword = '';
+    if (passwordProtected) {
+      if (password) {
+        // Hash the new password
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        finalPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } else {
+        // Keep existing password
+        finalPassword = sites[siteIndex].password;
+      }
+    }
+
     // Update site
     sites[siteIndex] = {
       ...sites[siteIndex],
       timeLimit: timeLimit,
-      password: passwordProtected ? (password || sites[siteIndex].password) : '',
+      password: finalPassword,
+      passwordProtected: passwordProtected,
       updatedAt: new Date().toISOString()
     };
     

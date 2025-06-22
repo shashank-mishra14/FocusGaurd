@@ -495,7 +495,7 @@
       right: 0;
       bottom: 0;
       background: rgba(0, 0, 0, 0.5);
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
@@ -505,6 +505,7 @@
     }
     
     .modal-overlay.show {
+      display: flex !important;
       opacity: 1;
       visibility: visible;
     }
@@ -722,7 +723,7 @@
         <div class="logo-text">FocusGuard</div>
       </div>
       <div class="header-actions">
-        <button class="header-btn" onclick="openDashboard()" title="Open Dashboard">
+        <button class="header-btn" title="Open Dashboard">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
             <line x1="9" y1="9" x2="15" y2="15"/>
@@ -848,7 +849,7 @@
         </svg>
         <span id="addSiteText">Add Current Site</span>
       </button>
-      <button class="btn btn-secondary" onclick="openDashboard()">
+      <button class="btn btn-secondary">
         Dashboard
       </button>
     </div>
@@ -859,7 +860,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">Add Protected Site</div>
-        <button class="modal-close" onclick="closeAddSiteModal()">
+        <button class="modal-close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -893,8 +894,8 @@
       </form>
       
       <div class="modal-actions">
-        <button type="button" class="btn-modal btn-modal-secondary" onclick="closeAddSiteModal()">Cancel</button>
-        <button type="button" class="btn-modal btn-modal-primary" onclick="confirmAddSite()">Add Site</button>
+        <button type="button" class="btn-modal btn-modal-secondary">Cancel</button>
+        <button type="button" class="btn-modal btn-modal-primary">Add Site</button>
       </div>
     </div>
   </div>
@@ -904,7 +905,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">Edit Site Settings</div>
-        <button class="modal-close" onclick="closeEditSiteModal()">
+        <button class="modal-close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -939,8 +940,8 @@
       </form>
       
       <div class="modal-actions">
-        <button type="button" class="btn-modal btn-modal-secondary" onclick="closeEditSiteModal()">Cancel</button>
-        <button type="button" class="btn-modal btn-modal-primary" onclick="confirmEditSite()">Save Changes</button>
+        <button type="button" class="btn-modal btn-modal-secondary">Cancel</button>
+        <button type="button" class="btn-modal btn-modal-primary">Save Changes</button>
       </div>
     </div>
   </div>

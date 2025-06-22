@@ -7,13 +7,15 @@ import AnalyticsDashboard from "@/dashboard"
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { token?: string }
+  searchParams: Promise<{ token?: string }>
 }) {
   const { userId } = await auth()
+  const params = await searchParams
   
   // If accessing with a token (from extension), validate it
-  if (searchParams.token && !userId) {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/extension/session?token=${searchParams.token}`)
+  if (params.token && !userId) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const response = await fetch(`${baseUrl}/api/extension/session?token=${params.token}`)
     const data = await response.json()
     
     if (!data.valid) {
@@ -38,7 +40,7 @@ export default async function DashboardPage({
             </div>
           </div>
           <Suspense fallback={<div>Loading analytics...</div>}>
-            <AnalyticsDashboard sessionToken={searchParams.token} />
+            <AnalyticsDashboard sessionToken={params.token} />
           </Suspense>
         </div>
       </div>

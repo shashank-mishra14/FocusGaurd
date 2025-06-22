@@ -6,23 +6,49 @@ import { eq, and, sql, gte } from 'drizzle-orm'
 // Get analytics data for dashboard
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const url = new URL(request.url)
+    const token = url.searchParams.get('token')
     const days = parseInt(url.searchParams.get('days') || '7')
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
     const startDateStr = startDate.toISOString().split('T')[0]
 
-    // Get user from database
-    const user = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
-    
-    if (user.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    let user;
+
+    if (token) {
+      // Token-based authentication (extension access)
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const sessionResponse = await fetch(`${baseUrl}/api/extension/session?token=${token}`)
+      const sessionData = await sessionResponse.json()
+      
+      if (!sessionData.valid) {
+        return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+      }
+
+      // Get user from database using clerkId from session
+      const userResult = await db.select().from(users).where(eq(users.clerkId, sessionData.user.clerkId)).limit(1)
+      
+      if (userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+      
+      user = userResult[0];
+    } else {
+      // Regular Clerk authentication
+      const { userId } = await auth()
+      
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Get user from database
+      const userResult = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
+      
+      if (userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+      
+      user = userResult[0];
     }
 
     // Get analytics data
@@ -34,7 +60,7 @@ export async function GET(request: NextRequest) {
     })
     .from(timeTracking)
     .where(and(
-      eq(timeTracking.userId, user[0].id),
+      eq(timeTracking.userId, user.id),
       gte(timeTracking.date, startDateStr)
     ))
 
@@ -47,7 +73,7 @@ export async function GET(request: NextRequest) {
     })
     .from(timeTracking)
     .where(and(
-      eq(timeTracking.userId, user[0].id),
+      eq(timeTracking.userId, user.id),
       gte(timeTracking.date, startDateStr)
     ))
     .groupBy(timeTracking.date)
@@ -60,7 +86,7 @@ export async function GET(request: NextRequest) {
     })
     .from(timeTracking)
     .where(and(
-      eq(timeTracking.userId, user[0].id),
+      eq(timeTracking.userId, user.id),
       gte(timeTracking.date, startDateStr)
     ))
     .groupBy(timeTracking.domain)
@@ -89,7 +115,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate session token
-    const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/extension/session?token=${token}`)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const sessionResponse = await fetch(`${baseUrl}/api/extension/session?token=${token}`)
     const sessionData = await sessionResponse.json()
     
     if (!sessionData.valid) {
@@ -104,16 +131,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user from database
-    const user = await db.select().from(users).where(eq(users.clerkId, sessionData.user.clerkId)).limit(1)
+    const userResult = await db.select().from(users).where(eq(users.clerkId, sessionData.user.clerkId)).limit(1)
     
-    if (user.length === 0) {
+    if (userResult.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    const user = userResult[0];
 
     // Check if record exists for this user, domain, and date
     const existingRecord = await db.select().from(timeTracking)
       .where(and(
-        eq(timeTracking.userId, user[0].id),
+        eq(timeTracking.userId, user.id),
         eq(timeTracking.domain, domain),
         eq(timeTracking.date, date)
       ))
@@ -128,14 +157,14 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date(),
         })
         .where(and(
-          eq(timeTracking.userId, user[0].id),
+          eq(timeTracking.userId, user.id),
           eq(timeTracking.domain, domain),
           eq(timeTracking.date, date)
         ))
     } else {
       // Create new record
       await db.insert(timeTracking).values({
-        userId: user[0].id,
+        userId: user.id,
         domain,
         date,
         timeSpent: timeSpent || 0,

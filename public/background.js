@@ -83,9 +83,11 @@ class BackgroundService {
       const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
       console.log('Protected sites:', protectedSites);
       
-      const protectedSite = protectedSites?.find(site => 
-        this.matchesDomain(url, site.domain)
-      );
+      const protectedSite = protectedSites?.find(site => {
+        const matches = this.matchesDomain(url, site.domain);
+        console.log('Checking site:', site.domain, 'against URL:', url, 'matches:', matches);
+        return matches;
+      });
       
       console.log('Found protected site:', protectedSite);
       
@@ -106,6 +108,8 @@ class BackgroundService {
 
   async handleProtectedSite(tab, protectedSite) {
     console.log('Handling protected site:', protectedSite);
+    console.log('Site password exists:', !!protectedSite.password);
+    console.log('Site time limit:', protectedSite.timeLimit);
     const today = new Date().toDateString();
     
     // Check time limits first
@@ -146,34 +150,42 @@ class BackgroundService {
   }
 
   async blockSite(tabId, reason, domain = '') {
-    console.log('Blocking site:', { tabId, reason, domain });
+    console.log('🚫 BLOCKING SITE:', { tabId, reason, domain });
     try {
-      // Wait a bit for the page to load
-      setTimeout(async () => {
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            func: this.showBlockedOverlay,
-            args: [reason, domain]
-          });
-          console.log('Overlay injected successfully');
-        } catch (error) {
-          console.error('Error injecting overlay:', error);
-          // Fallback: try using content script message
-          try {
-            await chrome.tabs.sendMessage(tabId, {
-              action: 'showBlockOverlay',
-              reason: reason,
-              domain: domain
-            });
-            console.log('Fallback message sent to content script');
-          } catch (msgError) {
-            console.error('Fallback message also failed:', msgError);
-          }
-        }
-      }, 500);
+      // First, try direct script injection
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: this.showBlockedOverlay,
+          args: [reason, domain]
+        });
+        console.log('✅ Overlay injected successfully via script');
+        return;
+      } catch (error) {
+        console.warn('Script injection failed, trying content script message:', error);
+      }
+
+      // Fallback: try using content script message
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'showBlockOverlay',
+          reason: reason,
+          domain: domain
+        });
+        console.log('✅ Fallback message sent to content script');
+        return;
+      } catch (msgError) {
+        console.error('❌ Both injection methods failed:', msgError);
+      }
+
+      // Last resort: try reloading with blocking page
+      console.log('🔄 Last resort: navigating to blocking page');
+      chrome.tabs.update(tabId, {
+        url: chrome.runtime.getURL(`blocked.html?reason=${reason}&domain=${domain}`)
+      });
+
     } catch (error) {
-      console.error('Error blocking site:', error);
+      console.error('❌ Critical error blocking site:', error);
     }
   }
 
@@ -351,6 +363,16 @@ class BackgroundService {
         case 'syncWithBackend':
           await this.syncProtectedSitesWithBackend();
           sendResponse({ success: true, message: 'Backend sync initiated' });
+          break;
+
+        case 'syncProtectedSitesWithBackend':
+          await this.syncProtectedSitesWithBackend();
+          sendResponse({ success: true, message: 'Protected sites sync initiated' });
+          break;
+
+        case 'generateSessionToken':
+          const token = await this.generateSessionToken();
+          sendResponse({ success: !!token, sessionToken: token });
           break;
           
         default:

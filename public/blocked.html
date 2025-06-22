@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusGuard - Site Blocked</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            color: #333;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        p {
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 10px;
+        }
+        
+        button.secondary {
+            background: #ccc;
+            color: #333;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        .error {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="content">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const reason = urlParams.get('reason');
+        const domain = urlParams.get('domain');
+        const content = document.getElementById('content');
+
+        if (reason === 'PASSWORD_REQUIRED') {
+            content.innerHTML = `
+                <h1>🔒 Protected Site</h1>
+                <p>Enter password to access ${domain}</p>
+                <input type="password" id="password" placeholder="Password">
+                <div>
+                    <button onclick="unlock()">Unlock</button>
+                    <button class="secondary" onclick="goBack()">Cancel</button>
+                </div>
+                <div id="error" class="error" style="display: none;"></div>
+            `;
+        } else if (reason === 'TIME_LIMIT_EXCEEDED') {
+            content.innerHTML = `
+                <h1>⏰ Time Limit Reached</h1>
+                <p>You've reached your daily time limit for ${domain}</p>
+                <p style="color: #888; font-size: 14px;">Take a break and come back tomorrow!</p>
+                <button onclick="goBack()">Go Back</button>
+            `;
+        }
+
+        function unlock() {
+            const password = document.getElementById('password').value;
+            if (!password) {
+                showError('Please enter a password');
+                return;
+            }
+
+            // Send message to background script to verify password
+            chrome.runtime.sendMessage({
+                action: 'verifyPassword',
+                domain: domain,
+                password: password
+            }, (response) => {
+                if (response && response.success) {
+                    // Password correct, redirect back
+                    window.location.href = `https://${domain}`;
+                } else {
+                    showError('Invalid password. Please try again.');
+                    document.getElementById('password').value = '';
+                }
+            });
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Focus password input if available
+        const passwordInput = document.getElementById('password');
+        if (passwordInput) {
+            passwordInput.focus();
+        }
+    </script>
+</body>
+</html> 

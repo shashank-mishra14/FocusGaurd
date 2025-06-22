@@ -124,7 +124,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   useEffect(() => {
     setIsVisible(true)
     loadAnalyticsData()
-  }, [sessionToken])
+  }, [sessionToken, timePeriod])
 
   const loadAnalyticsData = async () => {
     try {

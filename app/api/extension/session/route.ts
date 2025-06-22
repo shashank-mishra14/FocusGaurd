@@ -36,10 +36,11 @@ export async function POST() {
       expiresAt,
     })
 
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     return NextResponse.json({ 
       sessionToken,
       expiresAt,
-      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?token=${sessionToken}`
+      dashboardUrl: `${baseUrl}/dashboard?token=${sessionToken}`
     }, { status: 200 })
   } catch (error) {
     console.error('Error creating extension session:', error)
