@@ -1,4 +1,7 @@
 // FocusGuard Extension Popup Script
+let extensionToken = null;
+let currentUser = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('FocusGuard popup initializing...');
   await initializePopup();
@@ -7,6 +10,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initializePopup() {
   try {
     console.log('Starting popup initialization...');
+    
+    // Check if user is authenticated first
+    await checkAuthentication();
+    
     // Initialize all components
     await Promise.all([
       loadCurrentSite(),
@@ -16,12 +23,181 @@ async function initializePopup() {
     
     setupEventListeners();
     setupTabs();
-    initializeBackendSync();
     
     console.log('Popup initialized successfully');
   } catch (error) {
     console.error('Error initializing popup:', error);
     showMessage('Failed to load extension data', 'error');
+  }
+}
+
+async function checkAuthentication() {
+  try {
+    // Get stored token
+    const result = await chrome.storage.local.get(['extensionToken', 'currentUser']);
+    extensionToken = result.extensionToken;
+    currentUser = result.currentUser;
+    
+    console.log('Checking authentication...', { hasToken: !!extensionToken, currentUser });
+    
+    if (extensionToken) {
+      // Validate token
+      const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
+      const data = await response.json();
+      
+      if (data.valid) {
+        currentUser = data.user;
+        await chrome.storage.local.set({ currentUser });
+        showAuthenticatedState();
+        return true;
+      } else {
+        // Token is invalid, clear it
+        await chrome.storage.local.remove(['extensionToken', 'currentUser']);
+        extensionToken = null;
+        currentUser = null;
+      }
+    }
+    
+    showUnauthenticatedState();
+    return false;
+  } catch (error) {
+    console.error('Error checking authentication:', error);
+    showUnauthenticatedState();
+    return false;
+  }
+}
+
+function showAuthenticatedState() {
+  const authSection = document.getElementById('authSection');
+  if (authSection) {
+    authSection.innerHTML = `
+      <div class="auth-info">
+        <div class="user-info">
+          <span class="user-name">${currentUser?.firstName || 'User'}</span>
+          <span class="user-email">${currentUser?.email || ''}</span>
+        </div>
+        <button id="logoutBtn" class="btn-logout">Logout</button>
+      </div>
+    `;
+    
+    document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+  }
+  
+  // Show main content
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) {
+    mainContent.style.display = 'block';
+  }
+  
+  // Hide auth prompt
+  const authPrompt = document.getElementById('authPrompt');
+  if (authPrompt) {
+    authPrompt.style.display = 'none';
+  }
+}
+
+function showUnauthenticatedState() {
+  const authSection = document.getElementById('authSection');
+  if (authSection) {
+    authSection.innerHTML = `
+      <div class="auth-prompt">
+        <p>Connect your Protekt account to sync your settings</p>
+        <button id="loginBtn" class="btn-primary">Connect Account</button>
+      </div>
+    `;
+    
+    document.getElementById('loginBtn')?.addEventListener('click', handleLogin);
+  }
+  
+  // Hide main content
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) {
+    mainContent.style.display = 'none';
+  }
+  
+  // Show auth prompt
+  const authPrompt = document.getElementById('authPrompt');
+  if (authPrompt) {
+    authPrompt.style.display = 'block';
+  }
+}
+
+async function handleLogin() {
+  try {
+    // Open the dashboard which will handle authentication
+    chrome.tabs.create({
+      url: 'http://localhost:3000/dashboard?extension=true'
+    });
+    
+    // Start listening for the token
+    startTokenListener();
+  } catch (error) {
+    console.error('Error during login:', error);
+    showMessage('Failed to connect account', 'error');
+  }
+}
+
+function startTokenListener() {
+  // Listen for messages from the web page
+  chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    if (message.action === 'setExtensionToken') {
+      console.log('Received token from web app');
+      extensionToken = message.token;
+      await chrome.storage.local.set({ extensionToken });
+      
+      // Validate and get user info
+      await checkAuthentication();
+      
+      // Sync protected sites
+      await syncProtectedSitesFromBackend();
+      
+      sendResponse({ success: true });
+    }
+  });
+}
+
+async function handleLogout() {
+  try {
+    // Clear stored data
+    await chrome.storage.local.remove(['extensionToken', 'currentUser']);
+    extensionToken = null;
+    currentUser = null;
+    
+    showUnauthenticatedState();
+    showMessage('Logged out successfully', 'success');
+  } catch (error) {
+    console.error('Error during logout:', error);
+    showMessage('Failed to logout', 'error');
+  }
+}
+
+async function syncProtectedSitesFromBackend() {
+  if (!extensionToken) return;
+  
+  try {
+    console.log('Syncing protected sites from backend...');
+    const response = await fetch(`http://localhost:3000/api/protected-sites?token=${extensionToken}`);
+    const data = await response.json();
+    
+    if (data.sites) {
+      // Convert backend format to extension format
+      const protectedSites = data.sites.map(site => ({
+        domain: site.domain,
+        password: site.password,
+        timeLimit: site.timeLimit,
+        passwordProtected: site.passwordProtected,
+        isActive: site.isActive,
+        lastAccess: null // Reset session
+      }));
+      
+      await chrome.storage.local.set({ protectedSites });
+      console.log('Protected sites synced:', protectedSites.length);
+      
+      // Reload the sites display
+      await loadProtectedSites();
+    }
+  } catch (error) {
+    console.error('Error syncing protected sites:', error);
   }
 }
 
@@ -193,8 +369,11 @@ function setupEventListeners() {
   });
   
   console.log('Event listeners setup complete');
-  // Initialize backend synchronization
-  initializeBackendSync();
+  // Add event listener for the auth prompt button
+  const connectAccountBtn = document.getElementById('connectAccountBtn');
+  if (connectAccountBtn) {
+    connectAccountBtn.addEventListener('click', handleLogin);
+  }
 }
 
 function setupTabs() {
@@ -202,26 +381,7 @@ function setupTabs() {
   showTab('sites');
 }
 
-// Backend synchronization
-async function initializeBackendSync() {
-  try {
-    const { sessionToken, tokenExpiry } = await chrome.storage.local.get(['sessionToken', 'tokenExpiry']);
-    
-    if (sessionToken && tokenExpiry && new Date() < new Date(tokenExpiry)) {
-      console.log('Valid session found, syncing with backend...');
-      
-      chrome.runtime.sendMessage({
-        action: 'syncWithBackend'
-      }).catch(error => {
-        console.log('Background script not available for sync:', error);
-      });
-    } else {
-      console.log('No valid session for backend sync');
-    }
-  } catch (error) {
-    console.error('Error initializing backend sync:', error);
-  }
-}
+// Backend synchronization is now handled through the authentication flow
 
 async function loadCurrentSite() {
   try {
@@ -591,6 +751,13 @@ function toggleEditPasswordField() {
 
 async function confirmAddSite() {
   console.log('Confirm add site called');
+  
+  // Check if user is authenticated
+  if (!extensionToken) {
+    showMessage('Please connect your account first', 'error');
+    return;
+  }
+  
   try {
     const domain = document.getElementById('siteDomain').value;
     const timeLimit = parseInt(document.getElementById('timeLimit').value);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users, extensionSessions } from '@/lib/db'
 import { eq, and, gt } from 'drizzle-orm'
 import crypto from 'crypto'
@@ -13,11 +13,25 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user from database
-    const user = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
+    // Get or create user in database
+    let user = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
     
     if (user.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      // User doesn't exist, create them
+      const clerkUser = await currentUser()
+      
+      if (!clerkUser) {
+        return NextResponse.json({ error: 'User not found in Clerk' }, { status: 404 })
+      }
+
+      const newUser = await db.insert(users).values({
+        clerkId: userId,
+        email: clerkUser.emailAddresses[0]?.emailAddress,
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+      }).returning()
+      
+      user = newUser
     }
 
     // Generate session token

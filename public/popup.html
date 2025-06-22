@@ -42,6 +42,60 @@
       position: relative;
     }
     
+    /* Authentication Section */
+    .auth-section {
+      padding: 16px 20px;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .auth-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .user-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    
+    .user-email {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .auth-prompt {
+      text-align: center;
+    }
+    
+    .auth-prompt p {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+    
+    .btn-logout {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    
+    .btn-logout:hover {
+      background: #dc2626;
+    }
+    
     .header::after {
       content: '';
       position: absolute;
@@ -733,23 +787,30 @@
       </div>
     </div>
 
-    <!-- Daily Progress -->
-    <div class="daily-progress">
-      <div class="progress-header">
-        <div class="progress-title">Today's Focus</div>
-        <div class="progress-time" id="todayTime">180m / 240m</div>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-      <div class="progress-details">
-        <span id="sitesVisited">12 sites visited</span>
-        <span id="timeRemaining">60m remaining</span>
-      </div>
+    <!-- Authentication Section -->
+    <div class="auth-section" id="authSection">
+      <!-- Auth content will be dynamically inserted here -->
     </div>
 
-    <!-- Quick Stats -->
-    <div class="quick-stats">
+    <!-- Main Content (authenticated users only) -->
+    <div id="mainContent">
+      <!-- Daily Progress -->
+      <div class="daily-progress">
+        <div class="progress-header">
+          <div class="progress-title">Today's Focus</div>
+          <div class="progress-time" id="todayTime">180m / 240m</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-details">
+          <span id="sitesVisited">12 sites visited</span>
+          <span id="timeRemaining">60m remaining</span>
+        </div>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="quick-stats">
       <div class="stats-grid">
         <div class="stat-item">
           <span class="stat-value" id="totalSites">5</span>
@@ -838,6 +899,22 @@
           </div>
         </div>
       </div>
+    </div>
+    </div> <!-- End mainContent -->
+
+    <!-- Authentication Prompt (for unauthenticated users) -->
+    <div id="authPrompt" style="display: none; padding: 40px 20px; text-align: center;">
+      <div style="font-size: 24px; margin-bottom: 16px;">🔐</div>
+      <h3 style="font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">Connect Your Account</h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 20px; line-height: 1.5;">
+        Sign in to sync your protected sites, track your progress, and access advanced features.
+      </p>
+      <button id="connectAccountBtn" class="btn btn-primary" style="margin-bottom: 16px;">
+        Connect Protekt Account
+      </button>
+      <p style="font-size: 12px; color: #9ca3af;">
+        Your browsing data stays private and secure
+      </p>
     </div>
 
     <!-- Footer Actions -->

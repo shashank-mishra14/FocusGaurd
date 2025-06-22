@@ -333,6 +333,16 @@ class BackgroundService {
     
     try {
       switch (request.action) {
+        case 'setExtensionToken':
+          await chrome.storage.local.set({ 
+            extensionToken: request.token,
+            currentUser: request.user 
+          });
+          // Sync protected sites from backend after token is set
+          await this.syncProtectedSitesFromBackend();
+          sendResponse({ success: true });
+          break;
+          
         case 'addProtectedSite':
           await this.addProtectedSite(request.data);
           sendResponse({ success: true });
@@ -419,13 +429,13 @@ class BackgroundService {
   // NEW: Sync individual protected site with backend
   async syncProtectedSiteWithBackend(siteData) {
     try {
-      const { sessionToken } = await chrome.storage.local.get(['sessionToken']);
-      if (!sessionToken) {
-        console.log('No session token available for syncing protected site');
+      const { extensionToken } = await chrome.storage.local.get(['extensionToken']);
+      if (!extensionToken) {
+        console.log('No extension token available for syncing protected site');
         return;
       }
       
-      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${sessionToken}`, {
+      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${extensionToken}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -636,21 +646,36 @@ class BackgroundService {
   }
 
   // NEW: Sync protected sites with backend
-  async syncProtectedSitesWithBackend() {
+  async syncProtectedSitesFromBackend() {
     try {
-      const { sessionToken } = await chrome.storage.local.get(['sessionToken']);
-      if (!sessionToken) return;
-      
-      // Get protected sites from backend
-      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${sessionToken}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Update local storage with backend data
-        await chrome.storage.local.set({ protectedSites: data.sites });
-        console.log('Protected sites synced from backend');
+      const { extensionToken } = await chrome.storage.local.get(['extensionToken']);
+      if (!extensionToken) {
+        console.log('No extension token available for syncing');
+        return false;
       }
+      
+      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${extensionToken}`);
+      const data = await response.json();
+      
+      if (response.ok && data.sites) {
+        // Transform backend data to extension format
+        const protectedSites = data.sites.map(site => ({
+          domain: site.domain,
+          password: site.password,
+          timeLimit: site.timeLimit,
+          passwordProtected: site.passwordProtected,
+          isActive: site.isActive,
+          lastAccess: null // Reset session
+        }));
+        
+        await chrome.storage.local.set({ protectedSites });
+        console.log('Synced protected sites from backend:', protectedSites.length);
+        return true;
+      }
+      return false;
     } catch (error) {
-      console.error('Error syncing protected sites:', error);
+      console.error('Error syncing protected sites from backend:', error);
+      return false;
     }
   }
 

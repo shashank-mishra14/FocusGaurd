@@ -3,14 +3,20 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import AnalyticsDashboard from "@/dashboard"
+import ExtensionAuth from '@/components/ExtensionAuth'
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>
+  searchParams: Promise<{ token?: string; extension?: string }>
 }) {
   const { userId } = await auth()
   const params = await searchParams
+  
+  // If accessing from extension and user is authenticated, generate token
+  if (params.extension === 'true' && userId) {
+    return <ExtensionAuth />
+  }
   
   // If accessing with a token (from extension), validate it
   if (params.token && !userId) {
@@ -45,6 +51,11 @@ export default async function DashboardPage({
         </div>
       </div>
     )
+  }
+  
+  // If accessing from extension but not authenticated, show sign-in page
+  if (params.extension === 'true' && !userId) {
+    redirect('/sign-in?redirect_url=/dashboard?extension=true')
   }
   
   // Regular authenticated access
