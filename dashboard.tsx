@@ -137,10 +137,25 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   const loadAnalyticsData = async () => {
     try {
       setLoading(true)
-      const url = sessionToken 
-        ? `/api/analytics?token=${sessionToken}&days=${timePeriod === '7days' ? 7 : timePeriod === '30days' ? 30 : 7}`
-        : `/api/analytics?days=${timePeriod === '7days' ? 7 : timePeriod === '30days' ? 30 : 7}`
       
+      // Map time period to days
+      const getDaysFromPeriod = (period: string) => {
+        switch (period) {
+          case '24hours': return 1
+          case '7days': return 7
+          case '30days': return 30
+          default: return 7
+        }
+      }
+      
+      const days = getDaysFromPeriod(timePeriod)
+      console.log('Loading analytics for period:', timePeriod, 'days:', days)
+      
+      const url = sessionToken 
+        ? `/api/analytics?token=${sessionToken}&days=${days}`
+        : `/api/analytics?days=${days}`
+      
+      console.log('Fetching analytics from:', url)
       const response = await fetch(url)
       
       if (!response.ok) {
@@ -148,6 +163,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
       }
       
       const data = await response.json()
+      console.log('Analytics data received:', data)
       setAnalyticsData(data)
     } catch (error) {
       console.error('Error loading analytics:', error)
@@ -181,24 +197,72 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     { day: "Sun", minutes: 0, productive: 0, distracted: 0, focus: 100 },
   ]
 
-  const hourlyData = [
-    { hour: "6AM", usage: 5, focus: 90 },
-    { hour: "7AM", usage: 15, focus: 85 },
-    { hour: "8AM", usage: 45, focus: 75 },
-    { hour: "9AM", usage: 80, focus: 70 },
-    { hour: "10AM", usage: 95, focus: 65 },
-    { hour: "11AM", usage: 110, focus: 60 },
-    { hour: "12PM", usage: 85, focus: 55 },
-    { hour: "1PM", usage: 70, focus: 60 },
-    { hour: "2PM", usage: 90, focus: 65 },
-    { hour: "3PM", usage: 120, focus: 50 },
-    { hour: "4PM", usage: 100, focus: 55 },
-    { hour: "5PM", usage: 80, focus: 60 },
-    { hour: "6PM", usage: 60, focus: 70 },
-    { hour: "7PM", usage: 40, focus: 80 },
-    { hour: "8PM", usage: 30, focus: 85 },
-    { hour: "9PM", usage: 25, focus: 90 },
-  ]
+  // Generate hourly data based on analytics data
+  const hourlyData = (() => {
+    // If we have hourly data from API, use it
+    if (analyticsData?.hourlyTotals?.length) {
+      return analyticsData.hourlyTotals.map((hour: { hour: number; totalTime: number }) => {
+        const hourFormatted = hour.hour === 0 ? "12AM" : 
+                             hour.hour < 12 ? `${hour.hour}AM` : 
+                             hour.hour === 12 ? "12PM" : 
+                             `${hour.hour - 12}PM`;
+        const usage = Math.floor(hour.totalTime / 60); // Convert to minutes
+        const focus = Math.max(20, 100 - Math.floor(usage / 5)); // Focus score based on usage
+        
+        return {
+          hour: hourFormatted,
+          usage,
+          focus
+        };
+      });
+    }
+    
+    // If no hourly data, create estimated hourly distribution from daily data
+    if (analyticsData?.dailyTotals?.length && timePeriod === '24hours') {
+      const totalMinutes = Math.floor((analyticsData.dailyTotals[0]?.totalTime || 0) / 60);
+      const hours = [];
+      
+      // Simulate realistic usage pattern throughout the day
+      const usagePattern = [0.02, 0.03, 0.05, 0.08, 0.12, 0.15, 0.18, 0.20, 0.18, 0.15, 0.12, 0.10, 0.08, 0.06, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.03, 0.02];
+      
+      for (let i = 0; i < 24; i++) {
+        const hourFormatted = i === 0 ? "12AM" : 
+                             i < 12 ? `${i}AM` : 
+                             i === 12 ? "12PM" : 
+                             `${i - 12}PM`;
+        const usage = Math.floor(totalMinutes * usagePattern[i]);
+        const focus = Math.max(20, 100 - Math.floor(usage / 5));
+        
+        hours.push({
+          hour: hourFormatted,
+          usage,
+          focus
+        });
+      }
+      
+      return hours;
+    }
+    
+    // Default fallback for other time periods
+    return [
+    { hour: "6AM", usage: 0, focus: 100 },
+    { hour: "7AM", usage: 0, focus: 100 },
+    { hour: "8AM", usage: 0, focus: 100 },
+    { hour: "9AM", usage: 0, focus: 100 },
+    { hour: "10AM", usage: 0, focus: 100 },
+    { hour: "11AM", usage: 0, focus: 100 },
+    { hour: "12PM", usage: 0, focus: 100 },
+    { hour: "1PM", usage: 0, focus: 100 },
+    { hour: "2PM", usage: 0, focus: 100 },
+    { hour: "3PM", usage: 0, focus: 100 },
+    { hour: "4PM", usage: 0, focus: 100 },
+    { hour: "5PM", usage: 0, focus: 100 },
+    { hour: "6PM", usage: 0, focus: 100 },
+    { hour: "7PM", usage: 0, focus: 100 },
+    { hour: "8PM", usage: 0, focus: 100 },
+         { hour: "9PM", usage: 0, focus: 100 },
+    ];
+  })()
 
   // const siteDistributionData = [
   //   { name: "YouTube", minutes: 480, color: "#FF6B6B", category: "Entertainment" },
@@ -211,20 +275,91 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   //   { name: "Others", minutes: 160, color: "#A29BFE", category: "Various" },
   // ]
 
-  const weeklyTrendData = [
-    { week: "Week 1", totalTime: 1680, focusScore: 65, productivity: 72 },
-    { week: "Week 2", totalTime: 1520, focusScore: 68, productivity: 75 },
-    { week: "Week 3", totalTime: 1380, focusScore: 72, productivity: 78 },
-    { week: "Week 4", totalTime: 1200, focusScore: 76, productivity: 82 },
-  ]
+  // Generate trend data based on time period
+  const weeklyTrendData = (() => {
+    if (!analyticsData?.dailyTotals?.length) {
+      return [];
+    }
 
-  const categoryData = [
-    { category: "Work", time: 420, percentage: 35, color: "#10B981" },
-    { category: "Social Media", time: 360, percentage: 30, color: "#F59E0B" },
-    { category: "Entertainment", time: 240, percentage: 20, color: "#EF4444" },
-    { category: "News", time: 120, percentage: 10, color: "#8B5CF6" },
-    { category: "Other", time: 60, percentage: 5, color: "#6B7280" },
-  ]
+    if (timePeriod === '24hours') {
+      // For 24 hours, show hourly trends
+      return analyticsData.dailyTotals.slice(0, 6).map((day: { date: string; totalTime: number }, index: number) => ({
+        week: `${index * 4}:00`,
+        totalTime: Math.floor(day.totalTime / 60), // Convert to minutes
+        focusScore: Math.max(20, 100 - Math.floor(day.totalTime / 3600)), // Focus based on hours
+        productivity: Math.min(100, Math.max(20, 80 - Math.floor(day.totalTime / 1800))) // Productivity score
+      }));
+    } else {
+      // For multi-day periods, group by time chunks
+      const daysPerGroup = timePeriod === '7days' ? 1 : 7; // Daily for 7 days, weekly for 30 days
+      const data = [];
+      
+      for (let i = 0; i < analyticsData.dailyTotals.length; i += daysPerGroup) {
+        const group = analyticsData.dailyTotals.slice(i, i + daysPerGroup);
+        const totalTime = group.reduce((sum: number, day: { totalTime: number }) => sum + day.totalTime, 0);
+        const avgTime = totalTime / group.length;
+        
+        data.push({
+          week: timePeriod === '7days' ? `Day ${i + 1}` : `Week ${Math.floor(i / 7) + 1}`,
+          totalTime: Math.floor(totalTime / 60), // Convert to minutes
+          focusScore: Math.max(20, 100 - Math.floor(avgTime / 3600)), // Focus based on average hours
+          productivity: Math.min(100, Math.max(20, 80 - Math.floor(avgTime / 1800))) // Productivity score
+        });
+      }
+      
+      return data.slice(0, 8); // Max 8 data points for the chart
+    }
+  })()
+
+  // Generate category data from real analytics
+  const categoryData = (() => {
+    if (!analyticsData?.siteTotals?.length) {
+      return [
+        { category: "No Data", time: 0, percentage: 100, color: "#6B7280" }
+      ];
+    }
+
+    const categories = {
+      "Work": { time: 0, color: "#10B981" },
+      "Social Media": { time: 0, color: "#F59E0B" },
+      "Entertainment": { time: 0, color: "#EF4444" },
+      "Professional": { time: 0, color: "#8B5CF6" },
+      "News": { time: 0, color: "#06B6D4" },
+      "Other": { time: 0, color: "#6B7280" },
+    };
+
+    let totalTime = 0;
+
+    analyticsData.siteTotals.forEach((site: { domain: string; totalTime: number }) => {
+      const domain = site.domain;
+      const timeMinutes = Math.floor(site.totalTime / 60);
+      totalTime += timeMinutes;
+
+      if (domain.includes('github') || domain.includes('stackoverflow')) {
+        categories["Work"].time += timeMinutes;
+      } else if (domain.includes('facebook') || domain.includes('twitter') || domain.includes('instagram')) {
+        categories["Social Media"].time += timeMinutes;
+      } else if (domain.includes('youtube') || domain.includes('netflix') || domain.includes('twitch')) {
+        categories["Entertainment"].time += timeMinutes;
+      } else if (domain.includes('linkedin')) {
+        categories["Professional"].time += timeMinutes;
+      } else if (domain.includes('reddit') || domain.includes('news')) {
+        categories["News"].time += timeMinutes;
+      } else {
+        categories["Other"].time += timeMinutes;
+      }
+    });
+
+    return Object.entries(categories)
+      .filter(([, data]) => data.time > 0)
+      .map(([category, data]) => ({
+        category,
+        time: data.time,
+        percentage: totalTime > 0 ? Math.round((data.time / totalTime) * 100) : 0,
+        color: data.color
+      }))
+      .sort((a, b) => b.time - a.time);
+  })()
 
   const detailedSiteData = analyticsData?.siteTotals?.map((site: { domain: string; totalTime: number; totalVisits: number }) => {
     const hours = Math.floor(site.totalTime / 3600);
@@ -291,7 +426,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
       icon: Clock,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
-      description: "This week",
+      description: timePeriod === '24hours' ? "Last 24 hours" : timePeriod === '7days' ? "Last 7 days" : "Last 30 days",
     },
     {
       title: "Focus Score",
