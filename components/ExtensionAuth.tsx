@@ -31,27 +31,34 @@ export default function ExtensionAuth() {
       if (response.ok) {
         setToken(data.sessionToken)
         
-        // Try to send token to extension
-        if (typeof window !== 'undefined' && window.chrome?.runtime) {
+        // Store token in localStorage for extension to pick up
+        if (typeof window !== 'undefined') {
           try {
-            console.log('Sending token to extension...')
-            chrome.runtime.sendMessage({
-              action: 'setExtensionToken',
-              token: data.sessionToken
-            }, (response) => {
-              console.log('Extension response:', response)
-              if (response?.success) {
-                // Token sent successfully, redirect to dashboard
-                setTimeout(() => {
-                  router.push('/dashboard')
-                }, 2000)
-              }
-            })
-          } catch {
-            console.log('Extension not available, showing manual instructions')
+            console.log('Storing token for extension pickup...')
+            localStorage.setItem('protekt_extension_token', data.sessionToken)
+            localStorage.setItem('protekt_extension_token_timestamp', Date.now().toString())
+            
+            // Try to send message to extension if available
+            if (window.chrome?.runtime) {
+              chrome.runtime.sendMessage({
+                action: 'setExtensionToken',
+                token: data.sessionToken
+              }, (response) => {
+                console.log('Extension response:', response)
+                if (chrome.runtime.lastError) {
+                  console.log('Extension not reachable:', chrome.runtime.lastError)
+                }
+              })
+            }
+            
+            // Redirect to dashboard after short delay
+            setTimeout(() => {
+              router.push('/dashboard')
+            }, 2000)
+            
+          } catch (error) {
+            console.log('Error storing token:', error)
           }
-        } else {
-          console.log('Chrome extension API not available')
         }
       } else {
         console.error('API error:', data)

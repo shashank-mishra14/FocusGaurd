@@ -40,6 +40,11 @@ async function checkAuthentication() {
     
     console.log('Checking authentication...', { hasToken: !!extensionToken, currentUser });
     
+    // Check for token in localStorage (from web page)
+    if (!extensionToken) {
+      await checkForWebPageToken();
+    }
+    
     if (extensionToken) {
       // Validate token
       const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
@@ -65,6 +70,57 @@ async function checkAuthentication() {
     showUnauthenticatedState();
     return false;
   }
+}
+
+async function checkForWebPageToken() {
+  try {
+    // Get the active tab and check if it's our web app
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+    
+    if (activeTab && activeTab.url && activeTab.url.includes('localhost:3000')) {
+      // Execute script to check localStorage for token
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        func: () => {
+          const token = localStorage.getItem('protekt_extension_token');
+          const timestamp = localStorage.getItem('protekt_extension_token_timestamp');
+          
+          // Check if token is recent (within last 5 minutes)
+          if (token && timestamp) {
+            const tokenAge = Date.now() - parseInt(timestamp);
+            const fiveMinutes = 5 * 60 * 1000;
+            
+            if (tokenAge < fiveMinutes) {
+              // Clear the token from localStorage after retrieving it
+              localStorage.removeItem('protekt_extension_token');
+              localStorage.removeItem('protekt_extension_token_timestamp');
+              return token;
+            }
+          }
+          return null;
+        }
+      });
+      
+      if (results && results[0] && results[0].result) {
+        const token = results[0].result;
+        console.log('Found token from web page:', token);
+        
+        // Store the token in extension storage
+        extensionToken = token;
+        await chrome.storage.local.set({ extensionToken: token });
+        
+        // Sync protected sites
+        await syncProtectedSitesFromBackend();
+        
+        return true;
+      }
+    }
+  } catch (error) {
+    console.log('Could not check for web page token:', error);
+  }
+  
+  return false;
 }
 
 function showAuthenticatedState() {
@@ -99,14 +155,7 @@ function showAuthenticatedState() {
 function showUnauthenticatedState() {
   const authSection = document.getElementById('authSection');
   if (authSection) {
-    authSection.innerHTML = `
-      <div class="auth-prompt">
-        <p>Connect your Protekt account to sync your settings</p>
-        <button id="loginBtn" class="btn-primary">Connect Account</button>
-      </div>
-    `;
-    
-    document.getElementById('loginBtn')?.addEventListener('click', handleLogin);
+    authSection.style.display = 'none';
   }
   
   // Hide main content
@@ -129,32 +178,54 @@ async function handleLogin() {
       url: 'http://localhost:3000/dashboard?extension=true'
     });
     
-    // Start listening for the token
-    startTokenListener();
+    // Start polling for authentication
+    startAuthPolling();
   } catch (error) {
     console.error('Error during login:', error);
     showMessage('Failed to connect account', 'error');
   }
 }
 
-function startTokenListener() {
-  // Listen for messages from the web page
-  chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-    if (message.action === 'setExtensionToken') {
-      console.log('Received token from web app');
-      extensionToken = message.token;
-      await chrome.storage.local.set({ extensionToken });
+function startAuthPolling() {
+  console.log('Starting authentication polling...');
+  
+  // Poll every 2 seconds for authentication
+  const pollInterval = setInterval(async () => {
+    console.log('Checking for authentication...');
+    const authenticated = await checkForWebPageToken();
+    
+    if (authenticated) {
+      console.log('Authentication detected! Updating UI...');
+      clearInterval(pollInterval);
       
-      // Validate and get user info
+      // Re-check authentication to update the UI
       await checkAuthentication();
-      
-      // Sync protected sites
-      await syncProtectedSitesFromBackend();
-      
-      sendResponse({ success: true });
     }
-  });
+  }, 2000);
+  
+  // Stop polling after 5 minutes
+  setTimeout(() => {
+    clearInterval(pollInterval);
+    console.log('Authentication polling stopped');
+  }, 5 * 60 * 1000);
 }
+
+// Setup token listener for direct messaging
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  if (message.action === 'setExtensionToken') {
+    console.log('Received token from web app');
+    extensionToken = message.token;
+    await chrome.storage.local.set({ extensionToken });
+    
+    // Validate and get user info
+    await checkAuthentication();
+    
+    // Sync protected sites
+    await syncProtectedSitesFromBackend();
+    
+    sendResponse({ success: true });
+  }
+});
 
 async function handleLogout() {
   try {
