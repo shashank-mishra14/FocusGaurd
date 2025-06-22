@@ -120,6 +120,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   const [analyticsData, setAnalyticsData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     setIsVisible(true)
@@ -170,6 +171,38 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
       setError('Failed to load analytics data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const resetAnalyticsData = async () => {
+    if (!confirm('Are you sure you want to clear all analytics data? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setIsResetting(true)
+      const url = sessionToken 
+        ? `/api/analytics/reset?token=${sessionToken}`
+        : `/api/analytics/reset`
+      
+      const response = await fetch(url, { method: 'DELETE' })
+      
+      if (!response.ok) {
+        throw new Error('Failed to reset analytics data')
+      }
+      
+      const data = await response.json()
+      console.log('Analytics data reset:', data)
+      
+      // Reload analytics data
+      await loadAnalyticsData()
+      
+      alert('Analytics data has been cleared successfully!')
+    } catch (error) {
+      console.error('Error resetting analytics:', error)
+      alert('Failed to reset analytics data')
+    } finally {
+      setIsResetting(false)
     }
   }
 
