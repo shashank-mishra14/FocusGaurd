@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
       const record = existingRecord[0]
       const result = await db.update(timeTracking)
         .set({
-          timeSpent: record.timeSpent + Math.round(timeSpent),
-          visits: record.visits + 1,
+          timeSpent: (record.timeSpent || 0) + Math.round(timeSpent),
+          visits: (record.visits || 0) + 1,
           updatedAt: new Date(),
         })
         .where(and(
@@ -116,20 +116,50 @@ export async function POST(request: NextRequest) {
 // Get analytics data for dashboard
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    let dbUserId: number
 
-    // Get user from database
-    const user = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
-    
-    if (user.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    // Check if this is an extension request with Bearer token
+    const authHeader = request.headers.get('authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      
+      // Validate extension session
+      const session = await db.select({
+        userId: extensionSessions.userId,
+      })
+      .from(extensionSessions)
+      .innerJoin(users, eq(extensionSessions.userId, users.id))
+      .where(
+        and(
+          eq(extensionSessions.sessionToken, token),
+          eq(extensionSessions.isActive, true),
+          gte(extensionSessions.expiresAt, new Date())
+        )
+      )
+      .limit(1)
 
-    const dbUserId = user[0].id
+      if (session.length === 0) {
+        return NextResponse.json({ error: 'Invalid or expired extension session token' }, { status: 401 })
+      }
+
+      dbUserId = session[0].userId
+    } else {
+      // Use Clerk authentication for dashboard
+      const { userId } = await auth()
+      
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Get user from database
+      const user = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1)
+      
+      if (user.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+
+      dbUserId = user[0].id
+    }
 
     // Get query parameters
     const url = new URL(request.url)

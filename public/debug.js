@@ -116,4 +116,56 @@ console.log('- focusGuardDebug.testPassword() - Test password verification');
 console.log('- focusGuardDebug.clearData() - Clear all data');
 
 // Auto-run status check
-checkExtensionStatus(); 
+checkExtensionStatus();
+
+// Debug script to help with extension testing
+
+// Clear all extension storage
+async function clearExtensionStorage() {
+  try {
+    await chrome.storage.local.clear();
+    console.log('Extension storage cleared successfully');
+    return true;
+  } catch (error) {
+    console.error('Error clearing storage:', error);
+    return false;
+  }
+}
+
+// Clear authentication only
+async function clearAuth() {
+  try {
+    await chrome.storage.local.remove([
+      'extensionToken', 
+      'currentUser', 
+      'lastTokenCheck', 
+      'authPersistence'
+    ]);
+    console.log('Authentication data cleared');
+    return true;
+  } catch (error) {
+    console.error('Error clearing auth:', error);
+    return false;
+  }
+}
+
+// Check current storage state
+async function checkStorage() {
+  try {
+    const result = await chrome.storage.local.get();
+    console.log('Current extension storage:', result);
+    return result;
+  } catch (error) {
+    console.error('Error checking storage:', error);
+    return null;
+  }
+}
+
+// Export functions for console use
+window.debugExtension = {
+  clearStorage: clearExtensionStorage,
+  clearAuth,
+  checkStorage
+};
+
+console.log('Debug functions available: debugExtension.clearStorage(), debugExtension.clearAuth(), debugExtension.checkStorage()'); 

@@ -95,12 +95,12 @@ class BackgroundService {
       if (protectedSite) {
         console.log('Site is protected, handling protection...');
         await this.handleProtectedSite(tab, protectedSite);
+        
+        // Only start time tracking for protected sites
+        this.startTimeTracking(domain, tabId);
       } else {
-        console.log('Site is not protected');
+        console.log('Site is not protected - no time tracking');
       }
-      
-      // Start time tracking
-      this.startTimeTracking(domain, tabId);
       
     } catch (error) {
       console.error('Error handling tab change:', error);

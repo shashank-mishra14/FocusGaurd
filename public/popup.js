@@ -37,27 +37,36 @@ async function initializePopup() {
 async function checkAuthentication() {
   try {
     // Get stored token and user
-    const result = await chrome.storage.local.get(['extensionToken', 'currentUser', 'lastTokenCheck']);
+    const result = await chrome.storage.local.get(['extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence']);
     extensionToken = result.extensionToken;
     currentUser = result.currentUser;
     const lastTokenCheck = result.lastTokenCheck || 0;
+    const authPersistence = result.authPersistence || false;
     
     console.log('Checking authentication...', { 
       hasToken: !!extensionToken, 
       tokenLength: extensionToken?.length,
       currentUser: currentUser,
-      lastCheck: new Date(lastTokenCheck).toLocaleString()
+      lastCheck: new Date(lastTokenCheck).toLocaleString(),
+      authPersistence
     });
     
-    // Check for token in localStorage (from web page) if no token or last check was more than 5 minutes ago
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-    if (!extensionToken || lastTokenCheck < fiveMinutesAgo) {
+    // If we have cached auth data and it's recent (within 1 hour), use it
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    if (extensionToken && currentUser && lastTokenCheck > oneHourAgo) {
+      console.log('Using cached authentication (recent)');
+      showAuthenticatedState();
+      return true;
+    }
+    
+    // Check for token in localStorage (from web page) if no token or need refresh
+    if (!extensionToken || lastTokenCheck < oneHourAgo) {
       console.log('Checking for new token from web page...');
       await checkForWebPageToken();
     }
     
     if (extensionToken) {
-      // Validate token with server
+      // Validate token with server (but don't clear on network errors)
       console.log('Validating token with server...');
       try {
         const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
@@ -69,7 +78,8 @@ async function checkAuthentication() {
           currentUser = data.user;
           await chrome.storage.local.set({ 
             currentUser,
-            lastTokenCheck: Date.now()
+            lastTokenCheck: Date.now(),
+            authPersistence: true
           });
           console.log('Authentication successful, showing authenticated state');
           showAuthenticatedState();
@@ -79,20 +89,22 @@ async function checkAuthentication() {
           
           return true;
         } else {
-          // Token is invalid, clear it
-          console.log('Token invalid, clearing storage');
-          await chrome.storage.local.remove(['extensionToken', 'currentUser', 'lastTokenCheck']);
+          // Only clear token if we get explicit invalid response
+          console.log('Token explicitly invalid, clearing storage');
+          await chrome.storage.local.remove(['extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence']);
           extensionToken = null;
           currentUser = null;
         }
       } catch (networkError) {
-        console.warn('Network error validating token, using cached data:', networkError);
-        // If we have a cached user and just can't reach the server, show authenticated state
-        if (currentUser) {
+        console.warn('Network error validating token:', networkError);
+        // If we have cached user data, continue to show authenticated state
+        if (currentUser && authPersistence) {
           console.log('Using cached authentication due to network error');
           showAuthenticatedState();
           return true;
         }
+        // If completely offline and no cached auth, show unauthenticated but don't clear tokens
+        console.log('No cached auth and network offline, showing unauthenticated but keeping tokens');
       }
     }
     
@@ -120,14 +132,13 @@ async function checkForWebPageToken() {
               const token = localStorage.getItem('protekt_extension_token');
               const timestamp = localStorage.getItem('protekt_extension_token_timestamp');
               
-              // Check if token is recent (within last 10 minutes)
+              // Check if token is recent (within last 15 minutes for more reliability)
               if (token && timestamp) {
                 const tokenAge = Date.now() - parseInt(timestamp);
-                const tenMinutes = 10 * 60 * 1000;
+                const fifteenMinutes = 15 * 60 * 1000;
                 
-                if (tokenAge < tenMinutes) {
-                  // Don't clear the token from localStorage immediately
-                  // Let it persist for a while in case extension is reloaded
+                if (tokenAge < fifteenMinutes) {
+                  // Keep token for extended period to handle extension reloads
                   return { token, timestamp };
                 }
               }
@@ -598,17 +609,19 @@ async function loadProtectedSites() {
     const sites = protectedSites || [];
     
     const siteList = document.getElementById('siteList');
+    const noSitesMessage = document.getElementById('noSitesMessage');
     if (!siteList) return;
     
     if (sites.length === 0) {
-      siteList.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🔒</div>
-          <div class="empty-title">No protected sites yet</div>
-          <div class="empty-description">Add your first site to get started!</div>
-        </div>
-      `;
+      siteList.innerHTML = '';
+      if (noSitesMessage) {
+        noSitesMessage.style.display = 'block';
+      }
       return;
+    } else {
+      if (noSitesMessage) {
+        noSitesMessage.style.display = 'none';
+      }
     }
     
     // Get today's date for time calculations
@@ -713,13 +726,17 @@ async function loadStats() {
     // Calculate today's stats
     const today = new Date().toDateString();
     let todayTotal = 0;
-    let sitesVisitedToday = 0;
+    let protectedSitesVisitedToday = 0;
     
-    if (timeTrackingData) {
-      Object.values(timeTrackingData).forEach(siteData => {
-        const dayTime = siteData[today] || 0;
-        todayTotal += dayTime;
-        if (dayTime > 0) sitesVisitedToday++;
+    if (timeTrackingData && protectedSites) {
+      // Only count time from protected sites
+      protectedSites.forEach(protectedSite => {
+        const siteData = timeTrackingData[protectedSite.domain];
+        if (siteData) {
+          const dayTime = siteData[today] || 0;
+          todayTotal += dayTime;
+          if (dayTime > 0) protectedSitesVisitedToday++;
+        }
       });
     }
     
@@ -730,15 +747,15 @@ async function loadStats() {
     
     // Update UI elements
     updateElement('todayMinutes', todayMinutes);
-    updateElement('sitesVisited', `${sitesVisitedToday} sites visited`);
+    updateElement('sitesVisited', `${protectedSitesVisitedToday} protected sites visited`);
     updateElement('timeRemaining', `${remainingMinutes}m remaining`);
     updateElement('todayTime', `${todayMinutes}m / ${dailyLimit}m`);
-    updateElement('streakDays', calculateStreak(timeTrackingData));
+    updateElement('streakDays', calculateStreak(timeTrackingData, protectedSites));
     
     // Update analytics panel elements
     updateElement('analyticsTimeSpent', `${todayMinutes} minutes`);
-    updateElement('analyticsSitesVisited', sitesVisitedToday);
-    updateElement('analyticsStreak', calculateStreak(timeTrackingData));
+    updateElement('analyticsSitesVisited', protectedSitesVisitedToday);
+    updateElement('analyticsStreak', calculateStreak(timeTrackingData, protectedSites));
     
     // Update progress bar
     const progressFill = document.getElementById('progressFill');
@@ -758,6 +775,12 @@ async function loadStats() {
 
 async function syncAnalyticsWithBackend() {
   try {
+    // Only sync if we have a valid token
+    if (!extensionToken) {
+      console.log('No extension token available for analytics sync');
+      return;
+    }
+
     console.log('Syncing analytics with backend...');
     const response = await fetch(`http://localhost:3000/api/analytics?period=7`, {
       headers: {
@@ -782,9 +805,16 @@ async function syncAnalyticsWithBackend() {
         }
         
         console.log(`Analytics synced: ${totalBackendMinutes} minutes tracked across ${backendData.summary.length} sites`);
+      } else {
+        // No data yet, but sync was successful
+        const syncStatus = document.getElementById('syncStatus');
+        if (syncStatus) {
+          syncStatus.textContent = '✅ Synced (no data yet)';
+          syncStatus.className = 'sync-success';
+        }
       }
     } else {
-      console.warn('Failed to sync analytics with backend:', response.status);
+      console.warn('Failed to sync analytics with backend:', response.status, response.statusText);
       const syncStatus = document.getElementById('syncStatus');
       if (syncStatus) {
         syncStatus.textContent = '⚠️ Sync failed';
@@ -801,8 +831,8 @@ async function syncAnalyticsWithBackend() {
   }
 }
 
-function calculateStreak(timeTrackingData) {
-  if (!timeTrackingData) return 0;
+function calculateStreak(timeTrackingData, protectedSites) {
+  if (!timeTrackingData || !protectedSites) return 0;
   
   let streak = 0;
   const today = new Date();
@@ -813,8 +843,11 @@ function calculateStreak(timeTrackingData) {
     const dateStr = checkDate.toDateString();
     
     let dayHasActivity = false;
-    Object.values(timeTrackingData).forEach(siteData => {
-      if (siteData[dateStr] && siteData[dateStr] > 0) {
+    
+    // Only check protected sites for streak calculation
+    protectedSites.forEach(protectedSite => {
+      const siteData = timeTrackingData[protectedSite.domain];
+      if (siteData && siteData[dateStr] && siteData[dateStr] > 0) {
         dayHasActivity = true;
       }
     });

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Extension Fixes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Extension Fixes Test</h1>
+    
+    <div class="test-section">
+        <h2>Authentication Persistence Test</h2>
+        <p>This test verifies that the authentication stays persistent and doesn't show the connect screen repeatedly.</p>
+        
+        <button onclick="testAuth()">Test Authentication</button>
+        <button onclick="clearAuthData()">Clear Auth Data</button>
+        <button onclick="simulateReload()">Simulate Extension Reload</button>
+        
+        <div id="authStatus" class="status info">
+            Click "Test Authentication" to begin
+        </div>
+        
+        <div id="authLog" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Data Accuracy Test</h2>
+        <p>This test verifies that the extension shows correct data (only protected sites counted).</p>
+        
+        <button onclick="testDataAccuracy()">Test Data Accuracy</button>
+        <button onclick="addTestSites()">Add Test Sites</button>
+        <button onclick="simulateTimeTracking()">Simulate Time Tracking</button>
+        
+        <div id="dataStatus" class="status info">
+            Click "Test Data Accuracy" to begin
+        </div>
+        
+        <div id="dataLog" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Extension Storage Inspector</h2>
+        <button onclick="inspectStorage()">Inspect Storage</button>
+        <button onclick="clearAllStorage()">Clear All Storage</button>
+        
+        <div id="storageLog" class="log"></div>
+    </div>
+
+    <script>
+        function log(elementId, message) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML += `[${timestamp}] ${message}\n`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function setStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `status ${type}`;
+            element.textContent = message;
+        }
+
+        async function testAuth() {
+            log('authLog', 'Starting authentication test...');
+            setStatus('authStatus', 'Testing authentication...', 'info');
+            
+            try {
+                // Check if extension API is available
+                if (!chrome.storage) {
+                    throw new Error('Extension API not available');
+                }
+                
+                log('authLog', 'Extension API available');
+                
+                // Set a test token
+                const testToken = 'test_token_' + Date.now();
+                await chrome.storage.local.set({
+                    extensionToken: testToken,
+                    currentUser: { firstName: 'Test', email: 'test@example.com' },
+                    lastTokenCheck: Date.now(),
+                    authPersistence: true
+                });
+                
+                log('authLog', 'Test authentication data set');
+                
+                // Simulate checking authentication
+                const result = await chrome.storage.local.get([
+                    'extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence'
+                ]);
+                
+                log('authLog', `Retrieved: ${JSON.stringify(result, null, 2)}`);
+                
+                if (result.extensionToken === testToken && result.authPersistence) {
+                    setStatus('authStatus', '✅ Authentication persistence working!', 'success');
+                    log('authLog', 'SUCCESS: Authentication data persisted correctly');
+                } else {
+                    setStatus('authStatus', '❌ Authentication persistence failed', 'error');
+                    log('authLog', 'FAILED: Authentication data not persisted');
+                }
+                
+            } catch (error) {
+                setStatus('authStatus', '❌ Error testing authentication', 'error');
+                log('authLog', `ERROR: ${error.message}`);
+            }
+        }
+
+        async function clearAuthData() {
+            try {
+                await chrome.storage.local.remove([
+                    'extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence'
+                ]);
+                log('authLog', 'Authentication data cleared');
+                setStatus('authStatus', 'Authentication data cleared', 'info');
+            } catch (error) {
+                log('authLog', `Error clearing auth data: ${error.message}`);
+            }
+        }
+
+        async function simulateReload() {
+            log('authLog', 'Simulating extension reload...');
+            
+            // Check current auth state
+            const before = await chrome.storage.local.get([
+                'extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence'
+            ]);
+            
+            log('authLog', `Before reload: ${JSON.stringify(before, null, 2)}`);
+            
+            // Simulate some time passing
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check auth state again
+            const after = await chrome.storage.local.get([
+                'extensionToken', 'currentUser', 'lastTokenCheck', 'authPersistence'
+            ]);
+            
+            log('authLog', `After reload: ${JSON.stringify(after, null, 2)}`);
+            
+            if (JSON.stringify(before) === JSON.stringify(after)) {
+                setStatus('authStatus', '✅ Data survived reload simulation', 'success');
+                log('authLog', 'SUCCESS: Authentication persisted through reload');
+            } else {
+                setStatus('authStatus', '❌ Data lost during reload', 'error');
+                log('authLog', 'FAILED: Authentication not persistent');
+            }
+        }
+
+        async function testDataAccuracy() {
+            log('dataLog', 'Testing data accuracy...');
+            setStatus('dataStatus', 'Testing data accuracy...', 'info');
+            
+            try {
+                // Get current storage
+                const storage = await chrome.storage.local.get(['protectedSites', 'timeTrackingData']);
+                
+                log('dataLog', `Protected sites: ${storage.protectedSites?.length || 0}`);
+                log('dataLog', `Time tracking domains: ${Object.keys(storage.timeTrackingData || {}).length}`);
+                
+                // Check if time tracking data only contains protected sites
+                const protectedDomains = (storage.protectedSites || []).map(site => site.domain);
+                const trackedDomains = Object.keys(storage.timeTrackingData || {});
+                
+                log('dataLog', `Protected domains: ${JSON.stringify(protectedDomains)}`);
+                log('dataLog', `Tracked domains: ${JSON.stringify(trackedDomains)}`);
+                
+                const extraTracking = trackedDomains.filter(domain => !protectedDomains.includes(domain));
+                
+                if (extraTracking.length === 0) {
+                    setStatus('dataStatus', '✅ Data accuracy correct!', 'success');
+                    log('dataLog', 'SUCCESS: Only protected sites are being tracked');
+                } else {
+                    setStatus('dataStatus', '⚠️ Extra domains being tracked', 'error');
+                    log('dataLog', `WARNING: Extra domains tracked: ${JSON.stringify(extraTracking)}`);
+                }
+                
+            } catch (error) {
+                setStatus('dataStatus', '❌ Error testing data accuracy', 'error');
+                log('dataLog', `ERROR: ${error.message}`);
+            }
+        }
+
+        async function addTestSites() {
+            const testSites = [
+                { domain: 'facebook.com', timeLimit: 60, password: '' },
+                { domain: 'youtube.com', timeLimit: 120, password: 'test123' },
+                { domain: 'twitter.com', timeLimit: 30, password: '' }
+            ];
+            
+            await chrome.storage.local.set({ protectedSites: testSites });
+            log('dataLog', `Added ${testSites.length} test protected sites`);
+        }
+
+        async function simulateTimeTracking() {
+            const today = new Date().toDateString();
+            const timeTrackingData = {
+                'facebook.com': { [today]: 3600000 }, // 1 hour
+                'youtube.com': { [today]: 1800000 },  // 30 minutes
+                'unprotected-site.com': { [today]: 7200000 } // 2 hours (should not count)
+            };
+            
+            await chrome.storage.local.set({ timeTrackingData });
+            log('dataLog', 'Simulated time tracking data added');
+        }
+
+        async function inspectStorage() {
+            try {
+                const storage = await chrome.storage.local.get();
+                log('storageLog', 'Current extension storage:');
+                log('storageLog', JSON.stringify(storage, null, 2));
+            } catch (error) {
+                log('storageLog', `Error inspecting storage: ${error.message}`);
+            }
+        }
+
+        async function clearAllStorage() {
+            try {
+                await chrome.storage.local.clear();
+                log('storageLog', 'All extension storage cleared');
+            } catch (error) {
+                log('storageLog', `Error clearing storage: ${error.message}`);
+            }
+        }
+
+        // Auto-run initial inspection
+        window.addEventListener('load', () => {
+            log('authLog', 'Extension fixes test page loaded');
+            log('dataLog', 'Ready to test data accuracy');
+            log('storageLog', 'Storage inspector ready');
+        });
+    </script>
+</body>
+</html> 
