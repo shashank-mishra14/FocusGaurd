@@ -62,6 +62,7 @@ class BackgroundService {
       });
       
       const url = tab.url;
+      this.currentTabUrl = url;
       console.log('Handling tab change for URL:', url);
       
       if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
@@ -541,193 +542,212 @@ class BackgroundService {
 
   async updateTimeSpent(domain, timeSpent) {
     try {
-      const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
-      const today = new Date().toDateString();
+      const now = new Date();
+      const today = now.toDateString();
+      const currentHour = now.getHours();
       
-      if (!timeTrackingData[domain]) {
-        timeTrackingData[domain] = {};
+      // Get current tracking data
+      const { timeTrackingData, extensionToken } = await chrome.storage.local.get(['timeTrackingData', 'extensionToken']);
+      
+      // Initialize data structures
+      const updatedData = timeTrackingData || {};
+      if (!updatedData[domain]) {
+        updatedData[domain] = {};
+      }
+      if (!updatedData[domain][today]) {
+        updatedData[domain][today] = 0;
       }
       
-      if (!timeTrackingData[domain][today]) {
-        timeTrackingData[domain][today] = 0;
+      // Add time spent
+      updatedData[domain][today] += timeSpent;
+      
+      // Store updated data
+      await chrome.storage.local.set({ timeTrackingData: updatedData });
+      
+      console.log(`Time tracking updated for ${domain}:`, {
+        timeSpent: Math.round(timeSpent / 1000) + 's',
+        dailyTotal: Math.round(updatedData[domain][today] / 1000) + 's'
+      });
+      
+      // Sync with backend if authenticated
+      if (extensionToken) {
+        await this.syncWithBackend(domain, timeSpent, today, currentHour);
       }
       
-      timeTrackingData[domain][today] += timeSpent;
+      // Send analytics update to any open popups
+      chrome.runtime.sendMessage({
+        action: 'analyticsUpdated',
+        domain: domain,
+        timeSpent: timeSpent,
+        date: today
+      }).catch(() => {
+        // Ignore errors if no popup is listening
+      });
       
-      await chrome.storage.local.set({ timeTrackingData });
-      
-      // NEW: Sync with backend database
-      await this.syncWithBackend(domain, timeSpent, today);
-      
-      console.log('Time tracking updated:', domain, timeSpent);
     } catch (error) {
       console.error('Error updating time spent:', error);
     }
   }
 
-  // NEW: Backend synchronization method
-  async syncWithBackend(domain, timeSpent, date) {
-    try {
-      // Try to get session token from storage
-      const { sessionToken, tokenExpiry } = await chrome.storage.local.get(['sessionToken', 'tokenExpiry']);
-      
-      let validToken = sessionToken;
-      
-      // Check if token is expired or missing
-      if (!sessionToken || !tokenExpiry || new Date() > new Date(tokenExpiry)) {
-        console.log('No valid session token, attempting to generate one...');
-        validToken = await this.generateSessionToken();
-      }
-      
-      if (!validToken) {
-        console.log('Unable to sync with backend - no session token available');
-        return;
-      }
-      
-      // Submit analytics data to backend
-      const response = await fetch(`http://localhost:3000/api/analytics?token=${validToken}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          domain,
-          timeSpent,
-          visits: 1,
-          date: new Date(date).toISOString().split('T')[0] // Convert to YYYY-MM-DD format
-        })
-      });
-      
-      if (response.ok) {
-        console.log('Successfully synced data with backend:', domain, timeSpent);
-      } else {
-        console.log('Failed to sync with backend:', response.status, response.statusText);
-        // If token is invalid, clear it
-        if (response.status === 401) {
-          await chrome.storage.local.remove(['sessionToken', 'tokenExpiry']);
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing with backend:', error);
-    }
-  }
-
-  // NEW: Generate session token for backend communication
-  async generateSessionToken() {
-    try {
-      // This will only work if user has authenticated in the web app
-      const response = await fetch('http://localhost:3000/api/extension/session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include' // Include cookies for authentication
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.sessionToken) {
-          // Store token with expiry
-          const expiryDate = new Date(data.expiresAt);
-          await chrome.storage.local.set({
-            sessionToken: data.sessionToken,
-            tokenExpiry: expiryDate.toISOString()
-          });
-          console.log('Session token generated and stored');
-          return data.sessionToken;
-        }
-      } else {
-        console.log('Failed to generate session token:', response.status);
-      }
-    } catch (error) {
-      console.error('Error generating session token:', error);
-    }
-    return null;
-  }
-
-  // NEW: Sync protected sites with backend
-  async syncProtectedSitesFromBackend() {
+  async syncWithBackend(domain, timeSpent, date, hour) {
     try {
       const { extensionToken } = await chrome.storage.local.get(['extensionToken']);
+      
       if (!extensionToken) {
-        console.log('No extension token available for syncing');
-        return false;
+        console.log('No auth token, skipping backend sync');
+        return;
       }
-      
-      const response = await fetch(`http://localhost:3000/api/protected-sites?token=${extensionToken}`);
-      const data = await response.json();
-      
-      if (response.ok && data.sites) {
-        // Transform backend data to extension format
-        const protectedSites = data.sites.map(site => ({
-          domain: site.domain,
-          password: site.password,
-          timeLimit: site.timeLimit,
-          passwordProtected: site.passwordProtected,
-          isActive: site.isActive,
-          lastAccess: null // Reset session
-        }));
-        
-        await chrome.storage.local.set({ protectedSites });
-        console.log('Synced protected sites from backend:', protectedSites.length);
-        return true;
+
+      // Prepare analytics data
+      const analyticsData = {
+        domain: domain,
+        timeSpent: Math.round(timeSpent), // milliseconds
+        date: date,
+        hour: hour,
+        timestamp: new Date().toISOString(),
+        sessionId: this.generateSessionId(),
+        url: this.currentTabUrl || domain
+      };
+
+      console.log('Syncing analytics to backend:', analyticsData);
+
+      const response = await fetch('http://localhost:3000/api/analytics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${extensionToken}`
+        },
+        body: JSON.stringify(analyticsData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Analytics synced successfully:', result);
+      } else {
+        const error = await response.text();
+        console.error('Failed to sync analytics:', response.status, error);
       }
-      return false;
+
     } catch (error) {
-      console.error('Error syncing protected sites from backend:', error);
-      return false;
+      console.error('Error syncing analytics with backend:', error);
     }
+  }
+
+  generateSessionId() {
+    if (!this.sessionId) {
+      this.sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+    return this.sessionId;
   }
 
   async getAnalytics(period = 7) {
-    const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
-    const data = timeTrackingData || {};
-    
-    return this.calculateAnalytics(data, period);
+    try {
+      const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
+      
+      if (!timeTrackingData) {
+        return { success: true, data: {} };
+      }
+      
+      const analytics = this.calculateAnalytics(timeTrackingData, period);
+      
+      return {
+        success: true,
+        data: analytics
+      };
+    } catch (error) {
+      console.error('Error getting analytics:', error);
+      return { success: false, error: error.message };
+    }
   }
 
-  // Utility functions
   calculateAnalytics(timeTrackingData, period) {
     const analytics = {};
-    const dates = this.getDatesRange(period);
-
-    Object.entries(timeTrackingData).forEach(([domain, domainData]) => {
-      analytics[domain] = {
-        totalTime: 0,
-        dailyData: {},
-        averageDaily: 0
-      };
-
-      let validDays = 0;
-
-      dates.forEach(date => {
-        const dayTime = domainData[date] || 0;
-        analytics[domain].dailyData[date] = dayTime;
-        analytics[domain].totalTime += dayTime;
-
-        if (dayTime > 0) validDays++;
+    const datesRange = this.getDatesRange(period);
+    
+    // Process each domain
+    Object.keys(timeTrackingData).forEach(domain => {
+      const domainData = timeTrackingData[domain];
+      
+      // Calculate totals and daily breakdown
+      let totalTime = 0;
+      const dailyData = {};
+      const hourlyBreakdown = {};
+      
+      datesRange.forEach(dateString => {
+        const dayTime = domainData[dateString] || 0;
+        totalTime += dayTime;
+        dailyData[dateString] = dayTime;
       });
-
-      analytics[domain].averageDaily = validDays > 0 ? 
-        analytics[domain].totalTime / validDays : 0;
+      
+      // Calculate averages and streaks
+      const averageDaily = period > 0 ? totalTime / period : 0;
+      const activeDays = datesRange.filter(date => (domainData[date] || 0) > 0).length;
+      
+      // Calculate productivity metrics
+      const weekdayTotal = datesRange
+        .filter(date => {
+          const day = new Date(date).getDay();
+          return day > 0 && day < 6; // Monday to Friday
+        })
+        .reduce((sum, date) => sum + (domainData[date] || 0), 0);
+      
+      const weekendTotal = datesRange
+        .filter(date => {
+          const day = new Date(date).getDay();
+          return day === 0 || day === 6; // Saturday and Sunday
+        })
+        .reduce((sum, date) => sum + (domainData[date] || 0), 0);
+      
+      analytics[domain] = {
+        totalTime,
+        averageDaily,
+        activeDays,
+        dailyData,
+        hourlyBreakdown,
+        weekdayTotal,
+        weekendTotal,
+                 productivity: {
+           focusScore: this.calculateFocusScore(domainData),
+           consistency: activeDays / period,
+           trend: this.calculateTrend(domainData, datesRange)
+         }
+      };
     });
-
+    
     return analytics;
   }
 
-  getDatesRange(days) {
-    const dates = [];
-    const now = new Date();
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      dates.push(date.toDateString());
-    }
-
-    return dates;
+  calculateFocusScore(domainData) {
+    // Simple focus score based on consistency and time distribution
+    const days = Object.keys(domainData);
+    if (days.length === 0) return 0;
+    
+    const times = days.map(day => domainData[day]);
+    const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+    const variance = times.reduce((sum, time) => sum + Math.pow(time - avgTime, 2), 0) / times.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Lower deviation indicates more consistent usage (better focus)
+    const consistencyScore = avgTime > 0 ? Math.max(0, 1 - (standardDeviation / avgTime)) : 0;
+    
+    return Math.round(consistencyScore * 100);
   }
 
+  calculateTrend(domainData, datesRange) {
+    if (datesRange.length < 2) return 0;
+    
+    const firstHalf = datesRange.slice(0, Math.floor(datesRange.length / 2));
+    const secondHalf = datesRange.slice(Math.floor(datesRange.length / 2));
+    
+    const firstHalfAvg = firstHalf.reduce((sum, date) => sum + (domainData[date] || 0), 0) / firstHalf.length;
+    const secondHalfAvg = secondHalf.reduce((sum, date) => sum + (domainData[date] || 0), 0) / secondHalf.length;
+    
+    if (firstHalfAvg === 0) return secondHalfAvg > 0 ? 1 : 0;
+    
+    return (secondHalfAvg - firstHalfAvg) / firstHalfAvg;
+  }
+
+  // Utility functions
   extractDomain(url) {
     try {
       return new URL(url).hostname;

@@ -117,11 +117,15 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   const [isVisible, setIsVisible] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [analyticsData, setAnalyticsData] = useState<any>(null)
+  const [analyticsData, setAnalyticsData] = useState<{
+    dailyTotals?: { date: string; totalTime: number }[];
+    siteTotals?: { domain: string; totalTime: number; totalVisits: number }[];
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [isResetting, setIsResetting] = useState(false)
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isResetting, setIsResetting] = useState(false) // Used for loading state
+  
   useEffect(() => {
     setIsVisible(true)
     loadAnalyticsData()
@@ -174,6 +178,8 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     }
   }
 
+  // Function to reset analytics data - can be connected to UI later
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const resetAnalyticsData = async () => {
     if (!confirm('Are you sure you want to clear all analytics data? This action cannot be undone.')) {
       return;
@@ -228,7 +234,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     { day: "Fri", minutes: 0, productive: 0, distracted: 0, focus: 100 },
     { day: "Sat", minutes: 0, productive: 0, distracted: 0, focus: 100 },
     { day: "Sun", minutes: 0, productive: 0, distracted: 0, focus: 100 },
-  ]
+  ];
 
   // Generate hourly data based on analytics data
   const hourlyData = (() => {

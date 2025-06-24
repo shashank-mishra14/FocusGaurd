@@ -96,6 +96,17 @@
       background: #dc2626;
     }
     
+    /* Sync Status */
+    .sync-success {
+      color: #059669 !important;
+      font-weight: 500;
+    }
+    
+    .sync-error {
+      color: #dc2626 !important;
+      font-weight: 500;
+    }
+    
     .header::after {
       content: '';
       position: absolute;
@@ -857,10 +868,33 @@
       <!-- Analytics Tab -->
       <div class="tab-panel" id="analyticsPanel">
         <div style="padding: 20px;">
-          <div class="empty-state">
-            <div class="empty-icon">📊</div>
-            <div class="empty-title">Analytics Coming Soon</div>
-            <div class="empty-description">View detailed insights about your browsing habits</div>
+          <div style="margin-bottom: 16px;">
+            <h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">📊 Analytics Overview</h3>
+            <div id="syncStatus" style="font-size: 12px; color: #64748b; margin-bottom: 12px;">⏳ Loading...</div>
+            <div style="font-size: 13px; color: #64748b; line-height: 1.4;">
+              Real-time tracking of your browsing habits. Data syncs automatically with your dashboard when connected.
+            </div>
+          </div>
+          
+          <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 12px;">Today's Summary</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px;">
+              <div>
+                <div style="color: #64748b;">Time Spent</div>
+                <div style="font-weight: 600; color: #1e293b;" id="analyticsTimeSpent">0 minutes</div>
+              </div>
+              <div>
+                <div style="color: #64748b;">Sites Visited</div>
+                <div style="font-weight: 600; color: #1e293b;" id="analyticsSitesVisited">0</div>
+              </div>
+            </div>
+          </div>
+          
+          <div style="background: #f8fafc; border-radius: 8px; padding: 16px;">
+            <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 12px;">Weekly Streak</h4>
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">Consecutive days with tracked activity</div>
+            <div style="font-size: 24px; font-weight: 700; color: #6366f1;" id="analyticsStreak">0</div>
+            <div style="font-size: 11px; color: #64748b;">days</div>
           </div>
         </div>
       </div>

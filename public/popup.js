@@ -13,14 +13,16 @@ async function initializePopup() {
     console.log('Starting popup initialization...');
     
     // Check if user is authenticated first
-    await checkAuthentication();
+    const isAuthenticated = await checkAuthentication();
     
-    // Initialize all components
-    await Promise.all([
-      loadCurrentSite(),
-      loadProtectedSites(),
-      loadStats()
-    ]);
+    if (isAuthenticated) {
+      // Initialize all components
+      await Promise.all([
+        loadCurrentSite(),
+        loadProtectedSites(),
+        loadStats()
+      ]);
+    }
     
     setupEventListeners();
     setupTabs();
@@ -34,43 +36,63 @@ async function initializePopup() {
 
 async function checkAuthentication() {
   try {
-    // Get stored token
-    const result = await chrome.storage.local.get(['extensionToken', 'currentUser']);
+    // Get stored token and user
+    const result = await chrome.storage.local.get(['extensionToken', 'currentUser', 'lastTokenCheck']);
     extensionToken = result.extensionToken;
     currentUser = result.currentUser;
+    const lastTokenCheck = result.lastTokenCheck || 0;
     
     console.log('Checking authentication...', { 
       hasToken: !!extensionToken, 
       tokenLength: extensionToken?.length,
-      currentUser,
-      extensionToken 
+      currentUser: currentUser,
+      lastCheck: new Date(lastTokenCheck).toLocaleString()
     });
     
-    // Check for token in localStorage (from web page)
-    if (!extensionToken) {
+    // Check for token in localStorage (from web page) if no token or last check was more than 5 minutes ago
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    if (!extensionToken || lastTokenCheck < fiveMinutesAgo) {
+      console.log('Checking for new token from web page...');
       await checkForWebPageToken();
     }
     
     if (extensionToken) {
-      // Validate token
+      // Validate token with server
       console.log('Validating token with server...');
-      const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
-      const data = await response.json();
-      
-      console.log('Token validation response:', data);
-      
-      if (data.valid) {
-        currentUser = data.user;
-        await chrome.storage.local.set({ currentUser });
-        console.log('Authentication successful, showing authenticated state');
-        showAuthenticatedState();
-        return true;
-      } else {
-        // Token is invalid, clear it
-        console.log('Token invalid, clearing storage');
-        await chrome.storage.local.remove(['extensionToken', 'currentUser']);
-        extensionToken = null;
-        currentUser = null;
+      try {
+        const response = await fetch(`http://localhost:3000/api/extension/session?token=${extensionToken}`);
+        const data = await response.json();
+        
+        console.log('Token validation response:', data);
+        
+        if (data.valid) {
+          currentUser = data.user;
+          await chrome.storage.local.set({ 
+            currentUser,
+            lastTokenCheck: Date.now()
+          });
+          console.log('Authentication successful, showing authenticated state');
+          showAuthenticatedState();
+          
+          // Sync data from backend
+          await syncProtectedSitesFromBackend();
+          
+          return true;
+        } else {
+          // Token is invalid, clear it
+          console.log('Token invalid, clearing storage');
+          await chrome.storage.local.remove(['extensionToken', 'currentUser', 'lastTokenCheck']);
+          extensionToken = null;
+          currentUser = null;
+        }
+      } catch (networkError) {
+        console.warn('Network error validating token, using cached data:', networkError);
+        // If we have a cached user and just can't reach the server, show authenticated state
+        if (currentUser) {
+          console.log('Using cached authentication due to network error');
+          showAuthenticatedState();
+          return true;
+        }
       }
     }
     
@@ -85,46 +107,50 @@ async function checkAuthentication() {
 
 async function checkForWebPageToken() {
   try {
-    // Get the active tab and check if it's our web app
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const activeTab = tabs[0];
+    // Get all tabs and check for any that contain our web app
+    const tabs = await chrome.tabs.query({});
     
-    if (activeTab && activeTab.url && activeTab.url.includes('localhost:3000')) {
-      // Execute script to check localStorage for token
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: activeTab.id },
-        func: () => {
-          const token = localStorage.getItem('protekt_extension_token');
-          const timestamp = localStorage.getItem('protekt_extension_token_timestamp');
-          
-          // Check if token is recent (within last 5 minutes)
-          if (token && timestamp) {
-            const tokenAge = Date.now() - parseInt(timestamp);
-            const fiveMinutes = 5 * 60 * 1000;
-            
-            if (tokenAge < fiveMinutes) {
-              // Clear the token from localStorage after retrieving it
-              localStorage.removeItem('protekt_extension_token');
-              localStorage.removeItem('protekt_extension_token_timestamp');
-              return token;
+    for (const tab of tabs) {
+      if (tab.url && tab.url.includes('localhost:3000')) {
+        try {
+          // Execute script to check localStorage for token
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const token = localStorage.getItem('protekt_extension_token');
+              const timestamp = localStorage.getItem('protekt_extension_token_timestamp');
+              
+              // Check if token is recent (within last 10 minutes)
+              if (token && timestamp) {
+                const tokenAge = Date.now() - parseInt(timestamp);
+                const tenMinutes = 10 * 60 * 1000;
+                
+                if (tokenAge < tenMinutes) {
+                  // Don't clear the token from localStorage immediately
+                  // Let it persist for a while in case extension is reloaded
+                  return { token, timestamp };
+                }
+              }
+              return null;
             }
+          });
+          
+          if (results && results[0] && results[0].result) {
+            const { token } = results[0].result;
+            console.log('Found token from web page:', token);
+            
+            // Store the token in extension storage
+            extensionToken = token;
+            await chrome.storage.local.set({ 
+              extensionToken: token,
+              lastTokenCheck: Date.now()
+            });
+            
+            return true;
           }
-          return null;
+        } catch (scriptError) {
+          console.log('Could not execute script on tab:', tab.url, scriptError);
         }
-      });
-      
-      if (results && results[0] && results[0].result) {
-        const token = results[0].result;
-        console.log('Found token from web page:', token);
-        
-        // Store the token in extension storage
-        extensionToken = token;
-        await chrome.storage.local.set({ extensionToken: token });
-        
-        // Sync protected sites
-        await syncProtectedSitesFromBackend();
-        
-        return true;
       }
     }
   } catch (error) {
@@ -208,7 +234,7 @@ function startAuthPolling() {
   console.log('Starting authentication polling...');
   
   let pollCount = 0;
-  const maxPolls = 60; // Maximum 60 polls (2 minutes)
+  const maxPolls = 90; // Maximum 90 polls (3 minutes)
   
   // Poll every 2 seconds for authentication
   const pollInterval = setInterval(async () => {
@@ -241,13 +267,13 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.action === 'setExtensionToken') {
     console.log('Received token from web app');
     extensionToken = message.token;
-    await chrome.storage.local.set({ extensionToken });
+    await chrome.storage.local.set({ 
+      extensionToken: message.token,
+      lastTokenCheck: Date.now()
+    });
     
     // Validate and get user info
     await checkAuthentication();
-    
-    // Sync protected sites
-    await syncProtectedSitesFromBackend();
     
     sendResponse({ success: true });
   }
@@ -709,14 +735,69 @@ async function loadStats() {
     updateElement('todayTime', `${todayMinutes}m / ${dailyLimit}m`);
     updateElement('streakDays', calculateStreak(timeTrackingData));
     
+    // Update analytics panel elements
+    updateElement('analyticsTimeSpent', `${todayMinutes} minutes`);
+    updateElement('analyticsSitesVisited', sitesVisitedToday);
+    updateElement('analyticsStreak', calculateStreak(timeTrackingData));
+    
     // Update progress bar
     const progressFill = document.getElementById('progressFill');
     if (progressFill) {
       progressFill.style.width = `${progressPercent}%`;
     }
     
+    // Sync with backend if authenticated
+    if (extensionToken) {
+      await syncAnalyticsWithBackend();
+    }
+    
   } catch (error) {
     console.error('Error loading stats:', error);
+  }
+}
+
+async function syncAnalyticsWithBackend() {
+  try {
+    console.log('Syncing analytics with backend...');
+    const response = await fetch(`http://localhost:3000/api/analytics?period=7`, {
+      headers: {
+        'Authorization': `Bearer ${extensionToken}`
+      }
+    });
+    
+    if (response.ok) {
+      const backendData = await response.json();
+      console.log('Backend analytics data:', backendData);
+      
+      // Update analytics info display
+      if (backendData.summary && backendData.summary.length > 0) {
+        const totalBackendTime = backendData.summary.reduce((sum, site) => sum + (site.totalTime || 0), 0);
+        const totalBackendMinutes = Math.floor(totalBackendTime / 60000);
+        
+        // Show sync status
+        const syncStatus = document.getElementById('syncStatus');
+        if (syncStatus) {
+          syncStatus.textContent = `✅ Synced (${totalBackendMinutes}m tracked)`;
+          syncStatus.className = 'sync-success';
+        }
+        
+        console.log(`Analytics synced: ${totalBackendMinutes} minutes tracked across ${backendData.summary.length} sites`);
+      }
+    } else {
+      console.warn('Failed to sync analytics with backend:', response.status);
+      const syncStatus = document.getElementById('syncStatus');
+      if (syncStatus) {
+        syncStatus.textContent = '⚠️ Sync failed';
+        syncStatus.className = 'sync-error';
+      }
+    }
+  } catch (error) {
+    console.warn('Error syncing analytics with backend:', error);
+    const syncStatus = document.getElementById('syncStatus');
+    if (syncStatus) {
+      syncStatus.textContent = '⚠️ Sync offline';
+      syncStatus.className = 'sync-error';
+    }
   }
 }
 

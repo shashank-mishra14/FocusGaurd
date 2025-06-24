@@ -47,9 +47,21 @@ export default function ExtensionAuth() {
                 console.log('Extension response:', response)
                 if (chrome.runtime.lastError) {
                   console.log('Extension not reachable:', chrome.runtime.lastError)
+                } else if (response?.success) {
+                  // Clear token from localStorage once extension has it
+                  console.log('Extension confirmed token receipt, clearing localStorage')
+                  localStorage.removeItem('protekt_extension_token')
+                  localStorage.removeItem('protekt_extension_token_timestamp')
                 }
               })
             }
+            
+            // Also auto-clear the token after 30 seconds regardless
+            setTimeout(() => {
+              localStorage.removeItem('protekt_extension_token')
+              localStorage.removeItem('protekt_extension_token_timestamp')
+              console.log('Auto-cleared extension token from localStorage')
+            }, 30000)
             
             // Redirect to dashboard after short delay
             setTimeout(() => {
