@@ -170,40 +170,29 @@ class BackgroundService {
   async blockSite(tabId, reason, domain = '') {
     console.log('🚫 BLOCKING SITE:', { tabId, reason, domain });
     try {
-      // First, try direct script injection
+      // FORCE REDIRECT to blocking page immediately (most reliable method)
+      console.log('🔄 FORCING redirect to blocking page');
+      const blockingUrl = chrome.runtime.getURL(`blocked.html?reason=${reason}&domain=${domain}`);
+      console.log('📍 Blocking URL:', blockingUrl);
+      
+      await chrome.tabs.update(tabId, { url: blockingUrl });
+      console.log('✅ Successfully redirected to blocking page');
+      return;
+
+    } catch (error) {
+      console.error('❌ Critical error blocking site:', error);
+      
+      // Backup: try script injection
       try {
         await chrome.scripting.executeScript({
           target: { tabId },
           func: this.showBlockedOverlay,
           args: [reason, domain]
         });
-        console.log('✅ Overlay injected successfully via script');
-        return;
-      } catch (error) {
-        console.warn('Script injection failed, trying content script message:', error);
+        console.log('✅ Backup: Overlay injected successfully via script');
+      } catch (scriptError) {
+        console.error('❌ Both blocking methods failed:', scriptError);
       }
-
-      // Fallback: try using content script message
-      try {
-        await chrome.tabs.sendMessage(tabId, {
-          action: 'showBlockOverlay',
-          reason: reason,
-          domain: domain
-        });
-        console.log('✅ Fallback message sent to content script');
-        return;
-      } catch (msgError) {
-        console.error('❌ Both injection methods failed:', msgError);
-      }
-
-      // Last resort: try reloading with blocking page
-      console.log('🔄 Last resort: navigating to blocking page');
-      chrome.tabs.update(tabId, {
-        url: chrome.runtime.getURL(`blocked.html?reason=${reason}&domain=${domain}`)
-      });
-
-    } catch (error) {
-      console.error('❌ Critical error blocking site:', error);
     }
   }
 
