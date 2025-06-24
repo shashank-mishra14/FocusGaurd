@@ -108,48 +108,63 @@ class BackgroundService {
   }
 
   async handleProtectedSite(tab, protectedSite) {
-    console.log('Handling protected site:', protectedSite);
-    console.log('Site password exists:', !!protectedSite.password);
-    console.log('Site time limit:', protectedSite.timeLimit);
-    console.log('Site instant protect:', protectedSite.instantProtect);
-    const today = new Date().toDateString();
+    console.log('🔒 HANDLING PROTECTED SITE:', protectedSite);
+    console.log('🔑 Site password exists:', !!protectedSite.password);
+    console.log('⏰ Site time limit:', protectedSite.timeLimit);
+    console.log('⚡ Site instant protect:', protectedSite.instantProtect);
+    console.log('🌐 Tab URL:', tab.url);
+    console.log('🎯 Tab ID:', tab.id);
     
+    const today = new Date().toDateString();
     const isInstantProtect = protectedSite.instantProtect || protectedSite.timeLimit === 0;
+    
+    console.log('📊 Protection Analysis:', {
+      hasPassword: !!protectedSite.password,
+      isInstantProtect,
+      timeLimit: protectedSite.timeLimit,
+      lastAccess: protectedSite.lastAccess
+    });
     
     // Check password protection first (for both instant and time-limited protection)
     if (protectedSite.password) {
-      console.log('Site has password protection');
+      console.log('🔐 Site has password protection - checking session...');
       
       // Check if session is valid
       if (protectedSite.lastAccess && this.isSessionValid(protectedSite.lastAccess)) {
-        console.log('Session is still valid, allowing access');
+        console.log('✅ Session is still valid, allowing access');
       } else {
-        console.log('Password required, blocking site');
+        console.log('❌ Password required, BLOCKING SITE NOW');
         await this.blockSite(tab.id, 'PASSWORD_REQUIRED', protectedSite.domain);
         return;
       }
+    } else {
+      console.log('🔓 No password protection set for this site');
     }
     
     // Check time limits (only for non-instant protect sites)
     if (!isInstantProtect && protectedSite.timeLimit > 0) {
+      console.log('⏱️ Checking time limits...');
       const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
       const siteData = timeTrackingData?.[protectedSite.domain] || {};
       const todayTime = siteData[today] || 0;
       
-      console.log('Time limit check:', {
+      console.log('📈 Time limit check:', {
         timeLimit: protectedSite.timeLimit,
         todayTime: todayTime,
-        limitMs: protectedSite.timeLimit * 60 * 1000
+        limitMs: protectedSite.timeLimit * 60 * 1000,
+        exceeded: todayTime >= protectedSite.timeLimit * 60 * 1000
       });
       
       if (todayTime >= protectedSite.timeLimit * 60 * 1000) {
-        console.log('Time limit exceeded, blocking site');
+        console.log('⏰ Time limit exceeded, blocking site');
         await this.blockSite(tab.id, 'TIME_LIMIT_EXCEEDED', protectedSite.domain);
         return;
       }
+    } else if (isInstantProtect) {
+      console.log('⚡ Instant protect mode - no time tracking');
     }
     
-    console.log('Access granted for protected site');
+    console.log('✅ Access granted for protected site');
   }
 
   async blockSite(tabId, reason, domain = '') {
@@ -194,11 +209,15 @@ class BackgroundService {
 
   // This function runs in the content script context
   showBlockedOverlay(reason, domain) {
-    console.log('Showing blocked overlay:', reason, domain);
+    console.log('🎯 SCRIPT INJECTION: Showing blocked overlay for', reason, domain);
+    
+    // Add a visible test to confirm injection is working
+    alert(`🔒 FocusGuard: Password protection triggered for ${domain}!`);
     
     // Remove existing overlay
     const existingOverlay = document.getElementById('focusguard-overlay');
     if (existingOverlay) {
+      console.log('🗑️ Removing existing overlay');
       existingOverlay.remove();
     }
     
@@ -318,16 +337,35 @@ class BackgroundService {
     
     overlay.appendChild(content);
     
-    // Ensure overlay is added to the document
-    if (document.body) {
-      document.body.appendChild(overlay);
-    } else {
-      // If body not ready, wait for it
-      document.addEventListener('DOMContentLoaded', () => {
-        if (document.body) {
-          document.body.appendChild(overlay);
+    // Force add overlay to document
+    console.log('📝 Adding overlay to document. Body exists:', !!document.body);
+    
+    const addOverlay = () => {
+      if (document.body) {
+        document.body.appendChild(overlay);
+        console.log('✅ Overlay added to body successfully');
+        
+        // Verify overlay is in DOM
+        const addedOverlay = document.getElementById('focusguard-overlay');
+        console.log('🔍 Overlay verification:', {
+          exists: !!addedOverlay,
+          visible: addedOverlay ? window.getComputedStyle(addedOverlay).display : 'N/A',
+          zIndex: addedOverlay ? window.getComputedStyle(addedOverlay).zIndex : 'N/A'
+        });
+      } else {
+        console.log('❌ Document body not available yet');
+        // Try document.documentElement as fallback
+        if (document.documentElement) {
+          document.documentElement.appendChild(overlay);
+          console.log('✅ Overlay added to documentElement as fallback');
         }
-      });
+      }
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', addOverlay);
+    } else {
+      addOverlay();
     }
   }
 
@@ -386,6 +424,22 @@ class BackgroundService {
         case 'generateSessionToken':
           const token = await this.generateSessionToken();
           sendResponse({ success: !!token, sessionToken: token });
+          break;
+
+        case 'forceSyncAllData':
+          await this.forceSyncAllAnalyticsData();
+          sendResponse({ success: true, message: 'All data synced' });
+          break;
+
+        case 'testSiteProtection':
+          console.log('🧪 Testing site protection for tab:', request.tabId);
+          try {
+            await this.handleTabChange(request.tabId);
+            sendResponse({ success: true, message: 'Site protection tested' });
+          } catch (error) {
+            console.error('Error testing site protection:', error);
+            sendResponse({ success: false, error: error.message });
+          }
           break;
           
         default:
@@ -666,6 +720,19 @@ class BackgroundService {
     }
   }
 
+  getDatesRange(period) {
+    const dates = [];
+    const today = new Date();
+    
+    for (let i = period - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      dates.push(date.toDateString());
+    }
+    
+    return dates;
+  }
+
   calculateAnalytics(timeTrackingData, period) {
     const analytics = {};
     const datesRange = this.getDatesRange(period);
@@ -790,6 +857,68 @@ class BackgroundService {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async forceSyncAllAnalyticsData() {
+    try {
+      const { timeTrackingData, extensionToken } = await chrome.storage.local.get(['timeTrackingData', 'extensionToken']);
+      
+      if (!extensionToken) {
+        console.log('No extension token, cannot sync data');
+        return;
+      }
+
+      if (!timeTrackingData) {
+        console.log('No local analytics data to sync');
+        return;
+      }
+
+      console.log('🔄 Force syncing all analytics data:', timeTrackingData);
+
+      // Sync all data
+      for (const domain in timeTrackingData) {
+        const domainData = timeTrackingData[domain];
+        
+        for (const date in domainData) {
+          const timeSpent = domainData[date];
+          
+          if (timeSpent > 0) {
+            console.log(`Syncing ${domain} - ${date}: ${timeSpent}ms`);
+            
+            try {
+              const response = await fetch('http://localhost:3000/api/analytics', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${extensionToken}`
+                },
+                body: JSON.stringify({
+                  domain: domain,
+                  timeSpent: timeSpent,
+                  date: date,
+                  hour: new Date().getHours(),
+                  timestamp: new Date().toISOString(),
+                  sessionId: this.generateSessionId(),
+                  url: domain
+                })
+              });
+
+              if (response.ok) {
+                console.log(`✅ Synced ${domain} for ${date}`);
+              } else {
+                console.error(`❌ Failed to sync ${domain} for ${date}:`, response.status);
+              }
+            } catch (error) {
+              console.error(`❌ Error syncing ${domain} for ${date}:`, error);
+            }
+          }
+        }
+      }
+
+      console.log('🎉 Force sync completed');
+    } catch (error) {
+      console.error('❌ Error in force sync:', error);
+    }
   }
 }
 

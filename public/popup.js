@@ -223,7 +223,7 @@ async function handleLogin() {
   try {
     // Open the dashboard which will handle authentication
     chrome.tabs.create({
-      url: 'http://localhost:3000/dashboard?extension=true'
+              url: 'http://localhost:3000/dashboard?extension=true'
     });
     
     // Start polling for authentication
@@ -1376,7 +1376,7 @@ async function openDashboard() {
   } catch (error) {
     console.error('Error opening dashboard:', error);
     // Fallback to regular dashboard
-    chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+          chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
   }
 }
 
@@ -1423,9 +1423,77 @@ function showMessage(message, type = 'success') {
   }, 3000);
 }
 
+// Debug function to check data
+function debugData() {
+  chrome.storage.local.get(['protectedSites', 'timeTrackingData', 'extensionToken'], (result) => {
+    console.log('=== DEBUG DATA ===');
+    console.log('Protected Sites:', result.protectedSites);
+    console.log('Time Tracking Data:', result.timeTrackingData);
+    console.log('Extension Token:', result.extensionToken ? 'EXISTS' : 'MISSING');
+    console.log('==================');
+  });
+}
+
+// Force sync all data to backend
+function forceSyncData() {
+  console.log('🔄 Triggering force sync...');
+  chrome.runtime.sendMessage({ action: 'forceSyncAllData' }, (response) => {
+    if (response && response.success) {
+      console.log('✅ Force sync completed');
+      showMessage('All data synced to dashboard!', 'success');
+    } else {
+      console.error('❌ Force sync failed:', response);
+      showMessage('Sync failed - check console', 'error');
+    }
+  });
+}
+
+// Test password protection
+function testPasswordProtection() {
+  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    const currentTab = tabs[0];
+    if (currentTab) {
+      console.log('🧪 Testing password protection for current tab:', currentTab.url);
+      // Force re-evaluation of the current site
+      chrome.runtime.sendMessage({ 
+        action: 'testSiteProtection',
+        tabId: currentTab.id,
+        url: currentTab.url
+      }, (response) => {
+        console.log('Test result:', response);
+      });
+    }
+  });
+}
+
+// Show toast message
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: ${type === 'success' ? '#22c55e' : '#ef4444'};
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 1000;
+    font-size: 14px;
+    font-weight: 500;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => toast.remove(), 3000);
+}
+
 // Make functions available globally for HTML onclick handlers
 window.openDashboard = openDashboard;
 window.closeAddSiteModal = closeAddSiteModal;
 window.confirmAddSite = confirmAddSite;
 window.closeEditSiteModal = closeEditSiteModal;
-window.confirmEditSite = confirmEditSite; 
+window.confirmEditSite = confirmEditSite;
+window.debugData = debugData;
+window.forceSyncData = forceSyncData;
+window.testPasswordProtection = testPasswordProtection; 

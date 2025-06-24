@@ -1020,9 +1020,16 @@
         </svg>
         <span id="addSiteText">Add Current Site</span>
       </button>
-      <button class="btn btn-secondary">
+      <button class="btn btn-secondary" onclick="openDashboard()">
         Dashboard
       </button>
+    </div>
+    
+    <!-- Debug Actions (only visible in console) -->
+    <div style="display: none;">
+      <button onclick="debugData()">Debug Data</button>
+      <button onclick="forceSyncData()">Force Sync</button>
+      <button onclick="testPasswordProtection()">Test Password</button>
     </div>
   </div>
 
