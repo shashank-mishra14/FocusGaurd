@@ -111,10 +111,27 @@ class BackgroundService {
     console.log('Handling protected site:', protectedSite);
     console.log('Site password exists:', !!protectedSite.password);
     console.log('Site time limit:', protectedSite.timeLimit);
+    console.log('Site instant protect:', protectedSite.instantProtect);
     const today = new Date().toDateString();
     
-    // Check time limits first
-    if (protectedSite.timeLimit) {
+    const isInstantProtect = protectedSite.instantProtect || protectedSite.timeLimit === 0;
+    
+    // Check password protection first (for both instant and time-limited protection)
+    if (protectedSite.password) {
+      console.log('Site has password protection');
+      
+      // Check if session is valid
+      if (protectedSite.lastAccess && this.isSessionValid(protectedSite.lastAccess)) {
+        console.log('Session is still valid, allowing access');
+      } else {
+        console.log('Password required, blocking site');
+        await this.blockSite(tab.id, 'PASSWORD_REQUIRED', protectedSite.domain);
+        return;
+      }
+    }
+    
+    // Check time limits (only for non-instant protect sites)
+    if (!isInstantProtect && protectedSite.timeLimit > 0) {
       const { timeTrackingData } = await chrome.storage.local.get(['timeTrackingData']);
       const siteData = timeTrackingData?.[protectedSite.domain] || {};
       const todayTime = siteData[today] || 0;
@@ -132,22 +149,7 @@ class BackgroundService {
       }
     }
     
-    // Check password protection
-    if (protectedSite.password) {
-      console.log('Site has password protection');
-      
-      // Check if session is valid
-      if (protectedSite.lastAccess && this.isSessionValid(protectedSite.lastAccess)) {
-        console.log('Session is still valid, allowing access');
-        return;
-      }
-      
-      console.log('Password required, blocking site');
-      await this.blockSite(tab.id, 'PASSWORD_REQUIRED', protectedSite.domain);
-      return;
-    }
-    
-    console.log('No protection needed for this site');
+    console.log('Access granted for protected site');
   }
 
   async blockSite(tabId, reason, domain = '') {
@@ -406,12 +408,16 @@ class BackgroundService {
       if (existingIndex !== -1) {
         // Update existing site
         sites[existingIndex] = { ...sites[existingIndex], ...siteData };
+        if (siteData.password) {
+          sites[existingIndex].password = await this.hashPassword(siteData.password);
+        }
       } else {
         // Add new site
         sites.push({
           domain: siteData.domain,
           timeLimit: siteData.timeLimit || 0,
-          password: siteData.password ? await this.hashPassword(siteData.password) : undefined
+          password: siteData.password ? await this.hashPassword(siteData.password) : undefined,
+          instantProtect: siteData.instantProtect || false
         });
       }
       

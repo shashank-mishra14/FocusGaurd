@@ -13,11 +13,13 @@
     
     body {
       width: 360px;
-      height: 520px;
+      min-height: 520px;
+      max-height: none;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
       background: #ffffff;
       color: #1a1a1a;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
       line-height: 1.5;
       margin: 0;
       padding: 0;
@@ -26,11 +28,10 @@
     
     .container {
       background: #ffffff;
-      height: 100vh;
-      max-height: 520px;
+      min-height: 520px;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow: visible;
     }
     
     /* Header */
@@ -280,19 +281,16 @@
         /* Tab Content */
     .tab-content {
       flex: 1;
-      overflow-y: scroll;
-      overflow-x: hidden;
+      overflow: visible;
       padding: 0;
-      min-height: 0; /* Important for flexbox scrolling */
-      height: 320px; /* Fixed height to ensure scrolling works */
+      min-height: auto;
     }
 
     .tab-panel {
       display: none;
       animation: fadeIn 0.3s ease;
-      height: 100%;
-      min-height: 0;
-      overflow-y: scroll;
+      min-height: auto;
+      overflow: visible;
       padding: 16px;
       padding-bottom: 80px; /* Space for footer buttons */
       box-sizing: border-box;
@@ -522,6 +520,7 @@
       display: flex;
       gap: 8px;
       flex-shrink: 0;
+      margin-top: auto;
     }
     
     /* Animations */
@@ -540,30 +539,26 @@
     }
     
     /* Scrollbar */
-    .tab-content::-webkit-scrollbar,
-    .tab-panel::-webkit-scrollbar,
+    body::-webkit-scrollbar,
     .modal::-webkit-scrollbar {
       width: 8px;
     }
     
-    .tab-content::-webkit-scrollbar-track,
-    .tab-panel::-webkit-scrollbar-track,
+    body::-webkit-scrollbar-track,
     .modal::-webkit-scrollbar-track {
       background: #f1f5f9;
       border-radius: 4px;
       margin: 4px 0;
     }
     
-    .tab-content::-webkit-scrollbar-thumb,
-    .tab-panel::-webkit-scrollbar-thumb,
+    body::-webkit-scrollbar-thumb,
     .modal::-webkit-scrollbar-thumb {
       background: #94a3b8;
       border-radius: 4px;
       border: 1px solid #e2e8f0;
     }
     
-    .tab-content::-webkit-scrollbar-thumb:hover,
-    .tab-panel::-webkit-scrollbar-thumb:hover,
+    body::-webkit-scrollbar-thumb:hover,
     .modal::-webkit-scrollbar-thumb:hover {
       background: #64748b;
     }
@@ -996,13 +991,7 @@
             </p>
           </div>
           
-          <!-- Debug: Extra content to test scrolling -->
-          <div style="margin-top: 40px; padding: 16px; background: #f0f9ff; border-radius: 8px; border: 1px dashed #0ea5e9;">
-            <h4 style="font-size: 14px; font-weight: 600; color: #0c4a6e; margin-bottom: 8px;">🔍 Debug: Scroll Test</h4>
-            <p style="font-size: 12px; color: #0369a1; line-height: 1.4;">
-              If you can see this section, scrolling is working! This content should be at the bottom of the Settings tab.
-            </p>
-          </div>
+
       </div>
     </div>
     </div> <!-- End mainContent -->
@@ -1064,6 +1053,11 @@
         </div>
         
         <div class="form-checkbox">
+          <input type="checkbox" id="instantProtect">
+          <label for="instantProtect">Instant password protection (no time limit)</label>
+        </div>
+        
+        <div class="form-checkbox">
           <input type="checkbox" id="passwordProtected">
           <label for="passwordProtected">Password protect this site</label>
         </div>
@@ -1071,7 +1065,7 @@
         <div class="form-group hidden" id="passwordGroup">
           <label class="form-label">Password</label>
           <input type="password" class="form-input" id="sitePassword" placeholder="Enter password">
-          <div class="form-help">Required password to access this site after time limit</div>
+          <div class="form-help">Required password to access this site</div>
         </div>
       </form>
       
@@ -1107,6 +1101,11 @@
           <label class="form-label">Daily Time Limit (minutes)</label>
           <input type="number" class="form-input" id="editTimeLimit" min="1" max="1440">
           <div class="form-help">Maximum time allowed per day (1-1440 minutes)</div>
+        </div>
+        
+        <div class="form-checkbox">
+          <input type="checkbox" id="editInstantProtect">
+          <label for="editInstantProtect">Instant password protection (no time limit)</label>
         </div>
         
         <div class="form-checkbox">

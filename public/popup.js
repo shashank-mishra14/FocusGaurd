@@ -406,9 +406,21 @@ function setupEventListeners() {
     passwordCheckbox.addEventListener('change', togglePasswordField);
   }
   
+  // Instant protect checkbox
+  const instantProtectCheckbox = document.getElementById('instantProtect');
+  if (instantProtectCheckbox) {
+    instantProtectCheckbox.addEventListener('change', toggleInstantProtect);
+  }
+  
   const editPasswordCheckbox = document.getElementById('editPasswordProtected');
   if (editPasswordCheckbox) {
     editPasswordCheckbox.addEventListener('change', toggleEditPasswordField);
+  }
+
+  // Edit instant protect checkbox
+  const editInstantProtectCheckbox = document.getElementById('editInstantProtect');
+  if (editInstantProtectCheckbox) {
+    editInstantProtectCheckbox.addEventListener('change', toggleEditInstantProtect);
   }
   
   // Modal close buttons
@@ -633,6 +645,7 @@ async function loadProtectedSites() {
       siteElement.className = 'site-card';
       
       const timeLimit = site.timeLimit || 60;
+      const isInstantProtect = site.instantProtect || site.timeLimit === 0;
       
       // Get actual time used today for this site
       let timeUsed = 0;
@@ -640,9 +653,10 @@ async function loadProtectedSites() {
         timeUsed = Math.floor(timeTrackingData[site.domain][today] / 60000); // Convert from ms to minutes
       }
       
-      const isOverLimit = timeUsed >= timeLimit;
+      const isOverLimit = !isInstantProtect && timeUsed >= timeLimit;
       const hasPassword = site.password ? '🔒 ' : '';
       
+      // Always show protected sites with green styling, blocked ones get red
       if (isOverLimit) {
         siteElement.classList.add('blocked');
       }
@@ -655,11 +669,11 @@ async function loadProtectedSites() {
             <div class="site-name">
               ${hasPassword}${site.domain}
               <span class="site-status ${isOverLimit ? 'blocked' : 'active'}">
-                ${isOverLimit ? 'Blocked' : 'Active'}
+                ${isOverLimit ? 'Blocked' : (isInstantProtect ? 'Instant Protected' : 'Active')}
               </span>
             </div>
             <div class="site-time">
-              ⏱️ ${timeUsed}m / ${timeLimit}m daily limit
+              ${isInstantProtect ? '🛡️ Instant password protection' : `⏱️ ${timeUsed}m / ${timeLimit}m daily limit`}
             </div>
           </div>
           <div class="site-actions">
@@ -677,9 +691,9 @@ async function loadProtectedSites() {
             </button>
           </div>
         </div>
-        <div class="site-progress">
+        ${!isInstantProtect ? `<div class="site-progress">
           <div class="site-progress-fill ${isOverLimit ? 'over-limit' : ''}" style="width: ${progressPercent}%"></div>
-        </div>
+        </div>` : ''}
       `;
       
       // Add event listeners
@@ -900,11 +914,13 @@ async function showAddSiteModal() {
     const passwordCheckbox = document.getElementById('passwordProtected');
     const passwordInput = document.getElementById('sitePassword');
     const passwordGroup = document.getElementById('passwordGroup');
+    const instantProtectCheckbox = document.getElementById('instantProtect');
     
     if (timeLimitInput) timeLimitInput.value = '60';
     if (passwordCheckbox) passwordCheckbox.checked = false;
     if (passwordInput) passwordInput.value = '';
     if (passwordGroup) passwordGroup.classList.add('hidden');
+    if (instantProtectCheckbox) instantProtectCheckbox.checked = false;
     
     // Show modal with proper display
     const modal = document.getElementById('addSiteModal');
@@ -958,6 +974,30 @@ function togglePasswordField() {
   }
 }
 
+function toggleInstantProtect() {
+  const instantCheckbox = document.getElementById('instantProtect');
+  const passwordCheckbox = document.getElementById('passwordProtected');
+  const timeLimitInput = document.getElementById('timeLimit');
+  
+  if (instantCheckbox && passwordCheckbox && timeLimitInput) {
+    if (instantCheckbox.checked) {
+      // Enable password protection automatically
+      passwordCheckbox.checked = true;
+      togglePasswordField();
+      
+      // Disable time limit input
+      timeLimitInput.disabled = true;
+      timeLimitInput.value = '0';
+      timeLimitInput.style.background = '#f9fafb';
+    } else {
+      // Re-enable time limit input
+      timeLimitInput.disabled = false;
+      timeLimitInput.value = '60';
+      timeLimitInput.style.background = '#fff';
+    }
+  }
+}
+
 function toggleEditPasswordField() {
   const checkbox = document.getElementById('editPasswordProtected');
   const passwordGroup = document.getElementById('editPasswordGroup');
@@ -969,6 +1009,30 @@ function toggleEditPasswordField() {
     } else {
       passwordGroup.classList.add('hidden');
       document.getElementById('editSitePassword').value = '';
+    }
+  }
+}
+
+function toggleEditInstantProtect() {
+  const instantCheckbox = document.getElementById('editInstantProtect');
+  const passwordCheckbox = document.getElementById('editPasswordProtected');
+  const timeLimitInput = document.getElementById('editTimeLimit');
+  
+  if (instantCheckbox && passwordCheckbox && timeLimitInput) {
+    if (instantCheckbox.checked) {
+      // Enable password protection automatically
+      passwordCheckbox.checked = true;
+      toggleEditPasswordField();
+      
+      // Disable time limit input
+      timeLimitInput.disabled = true;
+      timeLimitInput.value = '0';
+      timeLimitInput.style.background = '#f9fafb';
+    } else {
+      // Re-enable time limit input
+      timeLimitInput.disabled = false;
+      timeLimitInput.value = '60';
+      timeLimitInput.style.background = '#fff';
     }
   }
 }
@@ -987,8 +1051,9 @@ async function confirmAddSite() {
     const timeLimit = parseInt(document.getElementById('timeLimit').value);
     const passwordProtected = document.getElementById('passwordProtected').checked;
     const password = document.getElementById('sitePassword').value;
+    const instantProtect = document.getElementById('instantProtect')?.checked || false;
     
-    console.log('Form data:', { domain, timeLimit, passwordProtected, hasPassword: !!password });
+    console.log('Form data:', { domain, timeLimit, passwordProtected, hasPassword: !!password, instantProtect });
     
     // Validation
     if (!domain) {
@@ -996,13 +1061,19 @@ async function confirmAddSite() {
       return;
     }
     
-    if (!timeLimit || timeLimit < 1 || timeLimit > 1440) {
+    // For instant protect, we don't need time limit validation
+    if (!instantProtect && (!timeLimit || timeLimit < 1 || timeLimit > 1440)) {
       showMessage('Time limit must be between 1 and 1440 minutes', 'error');
       return;
     }
     
     if (passwordProtected && !password) {
       showMessage('Password is required when password protection is enabled', 'error');
+      return;
+    }
+    
+    if (instantProtect && !passwordProtected) {
+      showMessage('Instant protection requires password protection to be enabled', 'error');
       return;
     }
     
@@ -1025,9 +1096,11 @@ async function confirmAddSite() {
     const newSite = {
       id: Date.now().toString(),
       domain: domain,
-      timeLimit: timeLimit,
+      timeLimit: instantProtect ? 0 : timeLimit, // 0 means instant protection
       password: hashedPassword,
       passwordProtected: passwordProtected,
+      instantProtect: instantProtect,
+      isActive: true,
       lastAccess: null, // Will be set when password is entered
       createdAt: Date.now(),
       addedAt: new Date().toISOString()
@@ -1045,7 +1118,7 @@ async function confirmAddSite() {
       console.log('Could not sync with backend:', error);
     }
     
-    const protection = passwordProtected ? ' with password protection' : '';
+    const protection = instantProtect ? ' with instant password protection' : (passwordProtected ? ' with password protection' : '');
     showMessage(`Added ${domain} to protected sites${protection}`, 'success');
     
     closeAddSiteModal();
@@ -1103,6 +1176,19 @@ async function editSite(domain) {
     document.getElementById('editPasswordProtected').checked = !!site.password;
     document.getElementById('editSitePassword').value = '';
     
+    const isInstantProtect = site.instantProtect || site.timeLimit === 0;
+    document.getElementById('editInstantProtect').checked = isInstantProtect;
+    
+    // Handle instant protect state
+    if (isInstantProtect) {
+      document.getElementById('editTimeLimit').disabled = true;
+      document.getElementById('editTimeLimit').style.background = '#f9fafb';
+      document.getElementById('editTimeLimit').value = '0';
+    } else {
+      document.getElementById('editTimeLimit').disabled = false;
+      document.getElementById('editTimeLimit').style.background = '#fff';
+    }
+    
     // Show/hide password field based on current state
     const passwordGroup = document.getElementById('editPasswordGroup');
     if (site.password) {
@@ -1148,10 +1234,16 @@ async function confirmEditSite() {
     const timeLimit = parseInt(document.getElementById('editTimeLimit').value);
     const passwordProtected = document.getElementById('editPasswordProtected').checked;
     const password = document.getElementById('editSitePassword').value;
+    const instantProtect = document.getElementById('editInstantProtect')?.checked || false;
     
     // Validation
-    if (!timeLimit || timeLimit < 1 || timeLimit > 1440) {
+    if (!instantProtect && (!timeLimit || timeLimit < 1 || timeLimit > 1440)) {
       showMessage('Time limit must be between 1 and 1440 minutes', 'error');
+      return;
+    }
+    
+    if (instantProtect && !passwordProtected) {
+      showMessage('Instant protection requires password protection to be enabled', 'error');
       return;
     }
     
@@ -1196,9 +1288,10 @@ async function confirmEditSite() {
     // Update site
     sites[siteIndex] = {
       ...sites[siteIndex],
-      timeLimit: timeLimit,
+      timeLimit: instantProtect ? 0 : timeLimit,
       password: finalPassword,
       passwordProtected: passwordProtected,
+      instantProtect: instantProtect,
       updatedAt: new Date().toISOString()
     };
     
@@ -1213,7 +1306,7 @@ async function confirmEditSite() {
       console.log('Could not sync with backend:', error);
     }
     
-    const protection = passwordProtected ? ' with password protection' : '';
+    const protection = instantProtect ? ' with instant password protection' : (passwordProtected ? ' with password protection' : '');
     showMessage(`Updated ${domain} settings${protection}`, 'success');
     
     closeEditSiteModal();
