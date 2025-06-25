@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay Test</title>
+</head>
+<body>
+    <h1>Testing Password Overlay</h1>
+    <p>This page tests if the password overlay can be triggered manually.</p>
+    
+    <button onclick="testOverlay()">Test Password Overlay</button>
+    <button onclick="checkStorage()">Check Storage</button>
+    <button onclick="clearStorageData()">Clear Storage</button>
+    
+    <div id="output" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; white-space: pre-wrap;"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+        }
+
+        async function testOverlay() {
+            log('Testing overlay injection...');
+            
+            try {
+                // Test if chrome extension API is available
+                if (typeof chrome === 'undefined' || !chrome.runtime) {
+                    log('Chrome extension API not available', 'error');
+                    return;
+                }
+
+                // Test if we can send messages to background script
+                chrome.runtime.sendMessage({
+                    action: 'testOverlay',
+                    domain: 'test.com'
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        log('Error sending message: ' + chrome.runtime.lastError.message, 'error');
+                    } else {
+                        log('Message sent successfully: ' + JSON.stringify(response), 'success');
+                    }
+                });
+
+                // Also test direct overlay injection
+                log('Attempting direct overlay injection...');
+                showTestOverlay();
+
+            } catch (error) {
+                log('Error in testOverlay: ' + error.message, 'error');
+            }
+        }
+
+        function showTestOverlay() {
+            // Remove existing overlay
+            const existing = document.getElementById('focusguard-overlay');
+            if (existing) {
+                existing.remove();
+            }
+
+            // Create test overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'focusguard-overlay';
+            overlay.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                z-index: 2147483647 !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            `;
+
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white !important;
+                padding: 40px !important;
+                border-radius: 20px !important;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
+                text-align: center !important;
+                max-width: 400px !important;
+                box-sizing: border-box !important;
+            `;
+
+            content.innerHTML = `
+                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important;">🔒 Test Overlay</h2>
+                <p style="color: #666 !important; margin: 0 0 20px 0 !important;">This is a test of the password overlay functionality</p>
+                <button onclick="document.getElementById('focusguard-overlay').remove()" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important;">Close</button>
+            `;
+
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+            
+            log('Test overlay created successfully', 'success');
+        }
+
+        async function checkStorage() {
+            log('Checking extension storage...');
+            
+            if (typeof chrome === 'undefined' || !chrome.storage) {
+                log('Chrome storage API not available', 'error');
+                return;
+            }
+
+            try {
+                const storage = await chrome.storage.local.get(['protectedSites', 'timeTrackingData']);
+                log('Storage contents:');
+                log('Protected sites: ' + JSON.stringify(storage.protectedSites, null, 2));
+                log('Time tracking: ' + JSON.stringify(storage.timeTrackingData, null, 2));
+            } catch (error) {
+                log('Error reading storage: ' + error.message, 'error');
+            }
+        }
+
+        async function clearStorageData() {
+            log('Clearing storage data...');
+            
+            if (typeof chrome === 'undefined' || !chrome.storage) {
+                log('Chrome storage API not available', 'error');
+                return;
+            }
+
+            try {
+                await chrome.storage.local.clear();
+                log('Storage cleared successfully', 'success');
+            } catch (error) {
+                log('Error clearing storage: ' + error.message, 'error');
+            }
+        }
+
+        // Auto-check storage on load
+        document.addEventListener('DOMContentLoaded', checkStorage);
+    </script>
+</body>
+</html> 

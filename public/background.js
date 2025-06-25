@@ -63,15 +63,15 @@ class BackgroundService {
       
       const url = tab.url;
       this.currentTabUrl = url;
-      console.log('Handling tab change for URL:', url);
+      console.log('🌍 HANDLING TAB CHANGE:', { tabId, url });
       
       if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-        console.log('Skipping system URL:', url);
+        console.log('⚠️ Skipping system URL:', url);
         return;
       }
       
       const domain = this.extractDomain(url);
-      console.log('Extracted domain:', domain);
+      console.log('🎯 Extracted domain:', domain);
       
       // Stop previous timer if exists
       if (this.currentTab && this.currentTab !== tabId) {
@@ -80,30 +80,43 @@ class BackgroundService {
       
       this.currentTab = tabId;
       
-      // Check if site is protected
+      // Check if site is protected with enhanced logging
       const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
-      console.log('Protected sites:', protectedSites);
+      console.log('📋 All protected sites:', protectedSites);
+      console.log('🔍 Looking for domain:', domain);
       
       const protectedSite = protectedSites?.find(site => {
         const matches = this.matchesDomain(url, site.domain);
-        console.log('Checking site:', site.domain, 'against URL:', url, 'matches:', matches);
+        console.log('🔎 Checking site:', {
+          protectedDomain: site.domain,
+          currentUrl: url,
+          matches: matches,
+          hasPassword: !!site.password,
+          instantProtect: site.instantProtect,
+          timeLimit: site.timeLimit
+        });
         return matches;
       });
       
-      console.log('Found protected site:', protectedSite);
-      
       if (protectedSite) {
-        console.log('Site is protected, handling protection...');
+        console.log('🎯 FOUND PROTECTED SITE:', {
+          domain: protectedSite.domain,
+          hasPassword: !!protectedSite.password,
+          instantProtect: protectedSite.instantProtect,
+          timeLimit: protectedSite.timeLimit,
+          lastAccess: protectedSite.lastAccess
+        });
+        
         await this.handleProtectedSite(tab, protectedSite);
         
         // Only start time tracking for protected sites
         this.startTimeTracking(domain, tabId);
       } else {
-        console.log('Site is not protected - no time tracking');
+        console.log('✅ Site is not protected - no blocking or time tracking');
       }
       
     } catch (error) {
-      console.error('Error handling tab change:', error);
+      console.error('❌ Error handling tab change:', error);
     }
   }
 
@@ -129,13 +142,13 @@ class BackgroundService {
     if (protectedSite.password) {
       console.log('🔐 Site has password protection - checking session...');
       
-      // Check if session is valid
-      if (protectedSite.lastAccess && this.isSessionValid(protectedSite.lastAccess)) {
-        console.log('✅ Session is still valid, allowing access');
-      } else {
-        console.log('❌ Password required, BLOCKING SITE NOW');
+      // Check if session is valid - FIXED: Block if no lastAccess OR session expired
+      if (!protectedSite.lastAccess || !this.isSessionValid(protectedSite.lastAccess)) {
+        console.log('❌ Password required (no session or expired), BLOCKING SITE NOW');
         await this.blockSite(tab.id, 'PASSWORD_REQUIRED', protectedSite.domain);
         return;
+      } else {
+        console.log('✅ Session is still valid, allowing access');
       }
     } else {
       console.log('🔓 No password protection set for this site');
@@ -199,9 +212,6 @@ class BackgroundService {
   // This function runs in the content script context
   showBlockedOverlay(reason, domain) {
     console.log('🎯 SCRIPT INJECTION: Showing blocked overlay for', reason, domain);
-    
-    // Add a visible test to confirm injection is working
-    alert(`🔒 FocusGuard: Password protection triggered for ${domain}!`);
     
     // Remove existing overlay
     const existingOverlay = document.getElementById('focusguard-overlay');
