@@ -455,11 +455,15 @@ class BackgroundService {
 
         case 'verifyPassword':
           console.log('🔐 Verifying password for domain:', request.domain);
+          console.log('🔑 Password length:', request.password?.length);
           const isValid = await this.verifyPassword(request.domain, request.password);
+          console.log('✅ Password verification result:', isValid);
           if (isValid) {
+            console.log('🎉 Password correct! Handling successful verification...');
             await this.handleSuccessfulPasswordVerification(request.domain);
             sendResponse({ success: true });
           } else {
+            console.log('❌ Password incorrect! Handling failed verification...');
             await this.handleFailedPasswordVerification();
             sendResponse({ success: false });
           }
@@ -492,6 +496,15 @@ class BackgroundService {
         case 'forceSyncAnalytics':
           console.log('📈 Force syncing analytics');
           await this.forceSyncAllAnalyticsData();
+          sendResponse({ success: true });
+          break;
+
+        case 'handleCancel':
+          console.log('❌ User cancelled password entry for:', request.domain);
+          // Redirect to a safe page instead of allowing access
+          if (this.currentTab) {
+            await chrome.tabs.update(this.currentTab, { url: 'chrome://newtab/' });
+          }
           sendResponse({ success: true });
           break;
 
@@ -581,21 +594,36 @@ class BackgroundService {
   }
 
   async verifyPassword(domain, password) {
+    console.log('🔍 Looking up site for domain:', domain);
     const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
-    const site = protectedSites?.find(s => s.domain === domain);
+    console.log('📋 All protected sites:', protectedSites?.map(s => ({ domain: s.domain, hasPassword: !!s.password })));
     
-    if (!site || !site.password) return false;
+    const site = protectedSites?.find(s => s.domain === domain);
+    console.log('🎯 Found site:', site ? { domain: site.domain, hasPassword: !!site.password } : 'NOT FOUND');
+    
+    if (!site || !site.password) {
+      console.log('❌ No site or no password found for domain:', domain);
+      return false;
+    }
     
     const hashedInput = await this.hashPassword(password);
+    console.log('🔐 Password hash comparison:', {
+      inputHash: hashedInput.substring(0, 20) + '...',
+      storedHash: site.password.substring(0, 20) + '...',
+      matches: hashedInput === site.password
+    });
+    
     return hashedInput === site.password;
   }
 
   async handleSuccessfulPasswordVerification(domain) {
     await this.updateLastAccess(domain);
     
-    // Reload the current tab to allow access
+    // Redirect to the original protected site
     if (this.currentTab) {
-      chrome.tabs.reload(this.currentTab);
+      const targetUrl = `https://${domain}`;
+      console.log('🔄 Redirecting to:', targetUrl);
+      await chrome.tabs.update(this.currentTab, { url: targetUrl });
     }
   }
 

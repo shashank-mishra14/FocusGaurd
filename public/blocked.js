@@ -78,7 +78,17 @@ if (reason === 'PASSWORD_REQUIRED') {
         if (cancelBtn) {
             cancelBtn.onclick = function() {
                 console.log('Cancel clicked');
-                window.history.back();
+                // Instead of going back (which could bypass protection), 
+                // close the tab or redirect to a safe page
+                chrome.runtime.sendMessage({
+                    action: 'handleCancel',
+                    domain: domain
+                }, function(response) {
+                    // If extension doesn't handle it, close tab
+                    if (!response) {
+                        window.close();
+                    }
+                });
             };
         }
         
