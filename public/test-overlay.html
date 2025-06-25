@@ -9,11 +9,14 @@
     <h1>Testing Password Overlay</h1>
     <p>This page tests if the password overlay can be triggered manually.</p>
     
-    <button onclick="testOverlay()">Test Password Overlay</button>
+    <button onclick="testPasswordOverlay()">Test Password Overlay</button>
+    <button onclick="testTimeOverlay()">Test Time Limit Overlay</button>
+    <button onclick="testGenericOverlay()">Test Generic Overlay</button>
     <button onclick="checkStorage()">Check Storage</button>
     <button onclick="clearStorageData()">Clear Storage</button>
+    <button onclick="addTestSite()">Add Test Protected Site</button>
     
-    <div id="output" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; white-space: pre-wrap;"></div>
+    <div id="output" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
 
     <script>
         function log(message, type = 'info') {
@@ -21,84 +24,299 @@
             const timestamp = new Date().toLocaleTimeString();
             const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
             output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
         }
 
-        async function testOverlay() {
-            log('Testing overlay injection...');
+        function testPasswordOverlay() {
+            log('Testing PASSWORD_REQUIRED overlay...');
+            showTestOverlay('PASSWORD_REQUIRED', 'test.com');
+        }
+
+        function testTimeOverlay() {
+            log('Testing TIME_LIMIT_EXCEEDED overlay...');
+            showTestOverlay('TIME_LIMIT_EXCEEDED', 'test.com');
+        }
+
+        function testGenericOverlay() {
+            log('Testing unknown reason overlay...');
+            showTestOverlay('UNKNOWN_REASON', 'test.com');
+        }
+
+        function showTestOverlay(reason, domain) {
+            log(`Creating overlay with reason: "${reason}" and domain: "${domain}"`);
             
-            try {
-                // Test if chrome extension API is available
-                if (typeof chrome === 'undefined' || !chrome.runtime) {
-                    log('Chrome extension API not available', 'error');
-                    return;
-                }
-
-                // Test if we can send messages to background script
-                chrome.runtime.sendMessage({
-                    action: 'testOverlay',
-                    domain: 'test.com'
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        log('Error sending message: ' + chrome.runtime.lastError.message, 'error');
-                    } else {
-                        log('Message sent successfully: ' + JSON.stringify(response), 'success');
-                    }
-                });
-
-                // Also test direct overlay injection
-                log('Attempting direct overlay injection...');
-                showTestOverlay();
-
-            } catch (error) {
-                log('Error in testOverlay: ' + error.message, 'error');
-            }
-        }
-
-        function showTestOverlay() {
             // Remove existing overlay
             const existing = document.getElementById('focusguard-overlay');
             if (existing) {
                 existing.remove();
+                log('Removed existing overlay');
             }
 
-            // Create test overlay
-            const overlay = document.createElement('div');
-            overlay.id = 'focusguard-overlay';
-            overlay.style.cssText = `
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-                z-index: 2147483647 !important;
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            `;
+            // Create test overlay using the same function from background.js
+            try {
+                // Simulate the background script injection
+                const overlayFunction = `
+                    (function(reason, domain) {
+                        console.log('🎯 SCRIPT INJECTION: Showing blocked overlay for', reason, domain);
+                        console.log('🔍 Parameters received:', { reason: reason, domain: domain, reasonType: typeof reason });
+                        
+                        // Remove existing overlay
+                        const existingOverlay = document.getElementById('focusguard-overlay');
+                        if (existingOverlay) {
+                            console.log('🗑️ Removing existing overlay');
+                            existingOverlay.remove();
+                        }
+                        
+                        // Create overlay
+                        const overlay = document.createElement('div');
+                        overlay.id = 'focusguard-overlay';
+                        overlay.style.cssText = \`
+                            position: fixed !important;
+                            top: 0 !important;
+                            left: 0 !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                            z-index: 2147483647 !important;
+                            display: flex !important;
+                            justify-content: center !important;
+                            align-items: center !important;
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                        \`;
+                        
+                        const content = document.createElement('div');
+                        content.style.cssText = \`
+                            background: white !important;
+                            padding: 40px !important;
+                            border-radius: 20px !important;
+                            box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
+                            text-align: center !important;
+                            max-width: 400px !important;
+                            box-sizing: border-box !important;
+                        \`;
+                        
+                        console.log('🧐 Checking reason condition:', reason === 'PASSWORD_REQUIRED');
+                        
+                        if (reason === 'PASSWORD_REQUIRED') {
+                            console.log('✅ Creating password UI...');
+                            content.innerHTML = \`
+                                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">🔒 Protected Site</h2>
+                                <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">Enter password to access \${domain}</p>
+                                <input type="password" id="focusguard-password" placeholder="Password" 
+                                       style="width: 100% !important; padding: 12px !important; border: 2px solid #ddd !important; border-radius: 8px !important; margin: 0 0 20px 0 !important; font-size: 16px !important; box-sizing: border-box !important;">
+                                <div style="display: flex !important; gap: 10px !important; justify-content: center !important;">
+                                    <button id="focusguard-unlock" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 14px !important;">Unlock</button>
+                                    <button id="focusguard-cancel" style="background: #ccc !important; color: #333 !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 14px !important;">Cancel</button>
+                                </div>
+                                <div id="focusguard-error" style="color: #ff4444 !important; margin-top: 10px !important; font-size: 14px !important; display: none;"></div>
+                            \`;
+                            
+                            console.log('🎨 Password UI HTML created');
+                            
+                            // Wait a moment for DOM to update, then set up event handlers
+                            setTimeout(() => {
+                                console.log('🔧 Setting up event handlers...');
+                                
+                                const passwordInput = content.querySelector('#focusguard-password');
+                                const unlockBtn = content.querySelector('#focusguard-unlock');
+                                const cancelBtn = content.querySelector('#focusguard-cancel');
+                                const errorDiv = content.querySelector('#focusguard-error');
+                                
+                                console.log('🔍 Elements found:', {
+                                    passwordInput: !!passwordInput,
+                                    unlockBtn: !!unlockBtn,
+                                    cancelBtn: !!cancelBtn,
+                                    errorDiv: !!errorDiv
+                                });
+                                
+                                if (unlockBtn) {
+                                    unlockBtn.onclick = () => {
+                                        console.log('🔓 Unlock button clicked');
+                                        const password = passwordInput?.value;
+                                        if (!password) {
+                                            showError('Please enter a password');
+                                            return;
+                                        }
+                                        
+                                        unlockBtn.disabled = true;
+                                        unlockBtn.textContent = 'Verifying...';
+                                        
+                                        // Simulate password verification for test
+                                        setTimeout(() => {
+                                            if (password === 'test') {
+                                                showSuccess('Access granted! (Test mode)');
+                                                setTimeout(() => overlay.remove(), 2000);
+                                            } else {
+                                                showError('Invalid password. Try "test"');
+                                                unlockBtn.disabled = false;
+                                                unlockBtn.textContent = 'Unlock';
+                                                if (passwordInput) {
+                                                    passwordInput.value = '';
+                                                    passwordInput.focus();
+                                                }
+                                            }
+                                        }, 1000);
+                                    };
+                                }
+                                
+                                if (cancelBtn) {
+                                    cancelBtn.onclick = () => {
+                                        console.log('❌ Cancel button clicked');
+                                        overlay.remove();
+                                    };
+                                }
+                                
+                                if (passwordInput) {
+                                    passwordInput.addEventListener('keypress', (e) => {
+                                        if (e.key === 'Enter') {
+                                            if (unlockBtn) unlockBtn.click();
+                                        }
+                                    });
+                                    
+                                    // Focus the password input
+                                    passwordInput.focus();
+                                }
+                                
+                                function showError(message) {
+                                    console.log('❌ Showing error:', message);
+                                    if (errorDiv) {
+                                        errorDiv.textContent = message;
+                                        errorDiv.style.display = 'block';
+                                    }
+                                    if (passwordInput) {
+                                        passwordInput.style.borderColor = '#ff4444';
+                                    }
+                                }
+                                
+                                function showSuccess(message) {
+                                    console.log('✅ Showing success:', message);
+                                    if (errorDiv) {
+                                        errorDiv.textContent = message;
+                                        errorDiv.style.color = '#22c55e';
+                                        errorDiv.style.display = 'block';
+                                    }
+                                }
+                                
+                            }, 100);
+                            
+                        } else if (reason === 'TIME_LIMIT_EXCEEDED') {
+                            console.log('⏰ Creating time limit UI...');
+                            content.innerHTML = \`
+                                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">⏰ Time Limit Reached</h2>
+                                <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">You've reached your daily time limit for \${domain}</p>
+                                <p style="color: #888 !important; margin: 0 0 20px 0 !important; font-size: 14px !important;">Take a break and come back tomorrow!</p>
+                                <div style="display: flex !important; gap: 10px !important; justify-content: center !important;">
+                                    <button id="focusguard-close" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 14px !important;">Go Back</button>
+                                </div>
+                            \`;
+                            
+                            setTimeout(() => {
+                                const closeBtn = content.querySelector('#focusguard-close');
+                                if (closeBtn) {
+                                    closeBtn.onclick = () => {
+                                        console.log('🔙 Close button clicked');
+                                        overlay.remove();
+                                    };
+                                }
+                            }, 100);
+                            
+                        } else {
+                            console.log('❓ Unknown reason, creating generic overlay');
+                            content.innerHTML = \`
+                                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">🚫 Site Blocked</h2>
+                                <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">This site is currently blocked</p>
+                                <p style="color: #888 !important; margin: 0 0 20px 0 !important; font-size: 14px !important;">Reason: \${reason}</p>
+                                <div style="display: flex !important; gap: 10px !important; justify-content: center !important;">
+                                    <button onclick="document.getElementById('focusguard-overlay').remove()" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 14px !important;">Go Back</button>
+                                </div>
+                            \`;
+                        }
+                        
+                        overlay.appendChild(content);
+                        
+                        // Force add overlay to document
+                        console.log('📝 Adding overlay to document. Body exists:', !!document.body);
+                        
+                        const addOverlay = () => {
+                            if (document.body) {
+                                document.body.appendChild(overlay);
+                                console.log('✅ Overlay added to body successfully');
+                                
+                                // Verify overlay is in DOM
+                                const addedOverlay = document.getElementById('focusguard-overlay');
+                                console.log('🔍 Overlay verification:', {
+                                    exists: !!addedOverlay,
+                                    visible: addedOverlay ? window.getComputedStyle(addedOverlay).display : 'N/A',
+                                    zIndex: addedOverlay ? window.getComputedStyle(addedOverlay).zIndex : 'N/A',
+                                    contentHTML: addedOverlay ? addedOverlay.innerHTML.substring(0, 200) + '...' : 'N/A'
+                                });
+                            } else {
+                                console.log('❌ Document body not available yet');
+                                if (document.documentElement) {
+                                    document.documentElement.appendChild(overlay);
+                                    console.log('✅ Overlay added to documentElement as fallback');
+                                } else {
+                                    console.log('❌ Neither body nor documentElement available');
+                                }
+                            }
+                        };
+                        
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', addOverlay);
+                        } else {
+                            addOverlay();
+                        }
+                    })('${reason}', '${domain}');
+                `;
+                
+                eval(overlayFunction);
+                log('Overlay injection completed', 'success');
+                
+            } catch (error) {
+                log('Error creating overlay: ' + error.message, 'error');
+            }
+        }
 
-            const content = document.createElement('div');
-            content.style.cssText = `
-                background: white !important;
-                padding: 40px !important;
-                border-radius: 20px !important;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
-                text-align: center !important;
-                max-width: 400px !important;
-                box-sizing: border-box !important;
-            `;
-
-            content.innerHTML = `
-                <h2 style="color: #333 !important; margin: 0 0 20px 0 !important;">🔒 Test Overlay</h2>
-                <p style="color: #666 !important; margin: 0 0 20px 0 !important;">This is a test of the password overlay functionality</p>
-                <button onclick="document.getElementById('focusguard-overlay').remove()" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important;">Close</button>
-            `;
-
-            overlay.appendChild(content);
-            document.body.appendChild(overlay);
+        async function addTestSite() {
+            log('Adding test protected site...');
             
-            log('Test overlay created successfully', 'success');
+            if (typeof chrome === 'undefined' || !chrome.storage) {
+                log('Chrome extension API not available', 'error');
+                return;
+            }
+
+            try {
+                const testSite = {
+                    id: Date.now().toString(),
+                    domain: 'test.com',
+                    password: await hashPassword('test123'),
+                    timeLimit: 30,
+                    instantProtect: false,
+                    lastAccess: null,
+                    createdAt: Date.now()
+                };
+
+                const { protectedSites } = await chrome.storage.local.get(['protectedSites']);
+                const sites = protectedSites || [];
+                
+                // Remove existing test.com if any
+                const filteredSites = sites.filter(s => s.domain !== 'test.com');
+                filteredSites.push(testSite);
+                
+                await chrome.storage.local.set({ protectedSites: filteredSites });
+                log('Test site added successfully: ' + JSON.stringify(testSite, null, 2), 'success');
+                
+            } catch (error) {
+                log('Error adding test site: ' + error.message, 'error');
+            }
+        }
+
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
         async function checkStorage() {
@@ -136,7 +354,10 @@
         }
 
         // Auto-check storage on load
-        document.addEventListener('DOMContentLoaded', checkStorage);
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded, checking initial state...');
+            checkStorage();
+        });
     </script>
 </body>
 </html> 

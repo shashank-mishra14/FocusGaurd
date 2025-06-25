@@ -29,6 +29,7 @@
             text-align: center;
             max-width: 400px;
             color: #333;
+            min-width: 350px;
         }
         
         h1 {
@@ -50,6 +51,19 @@
             border-radius: 8px;
             margin-bottom: 20px;
             font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        input[type="password"]:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 10px;
         }
         
         button {
@@ -60,7 +74,8 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            margin: 0 10px;
+            flex: 1;
+            max-width: 120px;
         }
         
         button.secondary {
@@ -72,84 +87,38 @@
             opacity: 0.9;
         }
         
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .message {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
         .error {
             color: #ff4444;
-            font-size: 14px;
-            margin-top: 10px;
+            background: #fff5f5;
+            border: 1px solid #ffcccc;
+        }
+        
+        .success {
+            color: #22c55e;
+            background: #f0fff4;
+            border: 1px solid #bbf7d0;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="content">
-            <!-- Content will be populated by JavaScript -->
+            <!-- Content will be set by JavaScript -->
         </div>
     </div>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const reason = urlParams.get('reason');
-        const domain = urlParams.get('domain');
-        const content = document.getElementById('content');
-
-        if (reason === 'PASSWORD_REQUIRED') {
-            content.innerHTML = `
-                <h1>🔒 Protected Site</h1>
-                <p>Enter password to access ${domain}</p>
-                <input type="password" id="password" placeholder="Password">
-                <div>
-                    <button onclick="unlock()">Unlock</button>
-                    <button class="secondary" onclick="goBack()">Cancel</button>
-                </div>
-                <div id="error" class="error" style="display: none;"></div>
-            `;
-        } else if (reason === 'TIME_LIMIT_EXCEEDED') {
-            content.innerHTML = `
-                <h1>⏰ Time Limit Reached</h1>
-                <p>You've reached your daily time limit for ${domain}</p>
-                <p style="color: #888; font-size: 14px;">Take a break and come back tomorrow!</p>
-                <button onclick="goBack()">Go Back</button>
-            `;
-        }
-
-        function unlock() {
-            const password = document.getElementById('password').value;
-            if (!password) {
-                showError('Please enter a password');
-                return;
-            }
-
-            // Send message to background script to verify password
-            chrome.runtime.sendMessage({
-                action: 'verifyPassword',
-                domain: domain,
-                password: password
-            }, (response) => {
-                if (response && response.success) {
-                    // Password correct, redirect back
-                    window.location.href = `https://${domain}`;
-                } else {
-                    showError('Invalid password. Please try again.');
-                    document.getElementById('password').value = '';
-                }
-            });
-        }
-
-        function goBack() {
-            window.history.back();
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // Focus password input if available
-        const passwordInput = document.getElementById('password');
-        if (passwordInput) {
-            passwordInput.focus();
-        }
-    </script>
+    <script src="blocked.js"></script>
 </body>
 </html> 

@@ -212,6 +212,7 @@ class BackgroundService {
   // This function runs in the content script context
   showBlockedOverlay(reason, domain) {
     console.log('🎯 SCRIPT INJECTION: Showing blocked overlay for', reason, domain);
+    console.log('🔍 Parameters received:', { reason: reason, domain: domain, reasonType: typeof reason });
     
     // Remove existing overlay
     const existingOverlay = document.getElementById('focusguard-overlay');
@@ -248,7 +249,10 @@ class BackgroundService {
       box-sizing: border-box !important;
     `;
     
+    console.log('🧐 Checking reason condition:', reason === 'PASSWORD_REQUIRED');
+    
     if (reason === 'PASSWORD_REQUIRED') {
+      console.log('✅ Creating password UI...');
       content.innerHTML = `
         <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">🔒 Protected Site</h2>
         <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">Enter password to access ${domain}</p>
@@ -261,64 +265,99 @@ class BackgroundService {
         <div id="focusguard-error" style="color: #ff4444 !important; margin-top: 10px !important; font-size: 14px !important; display: none;"></div>
       `;
       
-      const passwordInput = content.querySelector('#focusguard-password');
-      const unlockBtn = content.querySelector('#focusguard-unlock');
-      const cancelBtn = content.querySelector('#focusguard-cancel');
-      const errorDiv = content.querySelector('#focusguard-error');
+      console.log('🎨 Password UI HTML created');
       
-      unlockBtn.onclick = () => {
-        const password = passwordInput.value;
-        if (!password) {
-          showError('Please enter a password');
-          return;
-        }
+      // Wait a moment for DOM to update, then set up event handlers
+      setTimeout(() => {
+        console.log('🔧 Setting up event handlers...');
         
-        unlockBtn.disabled = true;
-        unlockBtn.textContent = 'Verifying...';
+        const passwordInput = content.querySelector('#focusguard-password');
+        const unlockBtn = content.querySelector('#focusguard-unlock');
+        const cancelBtn = content.querySelector('#focusguard-cancel');
+        const errorDiv = content.querySelector('#focusguard-error');
         
-        chrome.runtime.sendMessage({
-          action: 'verifyPassword',
-          domain: domain,
-          password: password
-        }, (response) => {
-          if (response && response.success) {
-            showSuccess('Access granted! Reloading...');
-          } else {
-            showError('Invalid password. Please try again.');
-            unlockBtn.disabled = false;
-            unlockBtn.textContent = 'Unlock';
-            passwordInput.value = '';
-            passwordInput.focus();
-          }
+        console.log('🔍 Elements found:', {
+          passwordInput: !!passwordInput,
+          unlockBtn: !!unlockBtn,
+          cancelBtn: !!cancelBtn,
+          errorDiv: !!errorDiv
         });
-      };
-      
-      cancelBtn.onclick = () => {
-        window.history.back();
-      };
-      
-      passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          unlockBtn.click();
+        
+        if (unlockBtn) {
+          unlockBtn.onclick = () => {
+            console.log('🔓 Unlock button clicked');
+            const password = passwordInput?.value;
+            if (!password) {
+              showError('Please enter a password');
+              return;
+            }
+            
+            unlockBtn.disabled = true;
+            unlockBtn.textContent = 'Verifying...';
+            
+            chrome.runtime.sendMessage({
+              action: 'verifyPassword',
+              domain: domain,
+              password: password
+            }, (response) => {
+              console.log('🔐 Password verification response:', response);
+              if (response && response.success) {
+                showSuccess('Access granted! Reloading...');
+              } else {
+                showError('Invalid password. Please try again.');
+                unlockBtn.disabled = false;
+                unlockBtn.textContent = 'Unlock';
+                if (passwordInput) {
+                  passwordInput.value = '';
+                  passwordInput.focus();
+                }
+              }
+            });
+          };
         }
-      });
-      
-      function showError(message) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-        passwordInput.style.borderColor = '#ff4444';
-      }
-      
-      function showSuccess(message) {
-        errorDiv.textContent = message;
-        errorDiv.style.color = '#22c55e';
-        errorDiv.style.display = 'block';
-      }
-      
-      // Focus password input
-      setTimeout(() => passwordInput.focus(), 100);
+        
+        if (cancelBtn) {
+          cancelBtn.onclick = () => {
+            console.log('❌ Cancel button clicked');
+            window.history.back();
+          };
+        }
+        
+        if (passwordInput) {
+          passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              if (unlockBtn) unlockBtn.click();
+            }
+          });
+          
+          // Focus the password input
+          passwordInput.focus();
+        }
+        
+        function showError(message) {
+          console.log('❌ Showing error:', message);
+          if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+          }
+          if (passwordInput) {
+            passwordInput.style.borderColor = '#ff4444';
+          }
+        }
+        
+        function showSuccess(message) {
+          console.log('✅ Showing success:', message);
+          if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.color = '#22c55e';
+            errorDiv.style.display = 'block';
+          }
+        }
+        
+      }, 100);
       
     } else if (reason === 'TIME_LIMIT_EXCEEDED') {
+      console.log('⏰ Creating time limit UI...');
       content.innerHTML = `
         <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">⏰ Time Limit Reached</h2>
         <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">You've reached your daily time limit for ${domain}</p>
@@ -328,10 +367,26 @@ class BackgroundService {
         </div>
       `;
       
-      const closeBtn = content.querySelector('#focusguard-close');
-      closeBtn.onclick = () => {
-        window.history.back();
-      };
+      setTimeout(() => {
+        const closeBtn = content.querySelector('#focusguard-close');
+        if (closeBtn) {
+          closeBtn.onclick = () => {
+            console.log('🔙 Close button clicked');
+            window.history.back();
+          };
+        }
+      }, 100);
+      
+    } else {
+      console.log('❓ Unknown reason, creating generic overlay');
+      content.innerHTML = `
+        <h2 style="color: #333 !important; margin: 0 0 20px 0 !important; font-size: 24px !important;">🚫 Site Blocked</h2>
+        <p style="color: #666 !important; margin: 0 0 20px 0 !important; font-size: 16px !important;">This site is currently blocked</p>
+        <p style="color: #888 !important; margin: 0 0 20px 0 !important; font-size: 14px !important;">Reason: ${reason}</p>
+        <div style="display: flex !important; gap: 10px !important; justify-content: center !important;">
+          <button onclick="window.history.back()" style="background: #667eea !important; color: white !important; border: none !important; padding: 12px 24px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 14px !important;">Go Back</button>
+        </div>
+      `;
     }
     
     overlay.appendChild(content);
@@ -349,7 +404,8 @@ class BackgroundService {
         console.log('🔍 Overlay verification:', {
           exists: !!addedOverlay,
           visible: addedOverlay ? window.getComputedStyle(addedOverlay).display : 'N/A',
-          zIndex: addedOverlay ? window.getComputedStyle(addedOverlay).zIndex : 'N/A'
+          zIndex: addedOverlay ? window.getComputedStyle(addedOverlay).zIndex : 'N/A',
+          contentHTML: addedOverlay ? addedOverlay.innerHTML.substring(0, 200) + '...' : 'N/A'
         });
       } else {
         console.log('❌ Document body not available yet');
@@ -357,6 +413,8 @@ class BackgroundService {
         if (document.documentElement) {
           document.documentElement.appendChild(overlay);
           console.log('✅ Overlay added to documentElement as fallback');
+        } else {
+          console.log('❌ Neither body nor documentElement available');
         }
       }
     };
@@ -369,83 +427,80 @@ class BackgroundService {
   }
 
   async handleMessage(request, sender, sendResponse) {
-    console.log('Handling message:', request.action);
+    console.log('🔔 Background received message:', request);
     
     try {
       switch (request.action) {
-        case 'setExtensionToken':
-          await chrome.storage.local.set({ 
-            extensionToken: request.token,
-            currentUser: request.user 
-          });
-          // Sync protected sites from backend after token is set
-          await this.syncProtectedSitesFromBackend();
-          sendResponse({ success: true });
+        case 'testOverlay':
+          console.log('🧪 Testing overlay for domain:', request.domain);
+          if (sender.tab?.id) {
+            await this.blockSite(sender.tab.id, 'PASSWORD_REQUIRED', request.domain);
+            sendResponse({ success: true, message: 'Test overlay triggered' });
+          } else {
+            sendResponse({ success: false, message: 'No tab ID available' });
+          }
           break;
           
         case 'addProtectedSite':
-          await this.addProtectedSite(request.data);
+          console.log('➕ Adding protected site:', request.siteData);
+          await this.addProtectedSite(request.siteData);
           sendResponse({ success: true });
           break;
-          
+
         case 'removeProtectedSite':
+          console.log('➖ Removing protected site:', request.domain);
           await this.removeProtectedSite(request.domain);
           sendResponse({ success: true });
           break;
-          
+
         case 'verifyPassword':
+          console.log('🔐 Verifying password for domain:', request.domain);
           const isValid = await this.verifyPassword(request.domain, request.password);
           if (isValid) {
             await this.handleSuccessfulPasswordVerification(request.domain);
-            sendResponse({ success: true, action: 'passwordVerified' });
+            sendResponse({ success: true });
           } else {
             await this.handleFailedPasswordVerification();
-            sendResponse({ success: false, error: 'Invalid password' });
+            sendResponse({ success: false });
           }
           break;
-          
+
         case 'getAnalytics':
-          const analytics = await this.getAnalytics(request.period);
+          console.log('📊 Getting analytics data');
+          const analytics = await this.getAnalytics(request.period || 7);
           sendResponse({ success: true, data: analytics });
           break;
 
-        // NEW: Handle backend sync request
-        case 'syncWithBackend':
-          await this.syncProtectedSitesWithBackend();
-          sendResponse({ success: true, message: 'Backend sync initiated' });
+        case 'clearData':
+          console.log('🗑️ Clearing all data');
+          await chrome.storage.local.clear();
+          sendResponse({ success: true });
           break;
 
         case 'syncProtectedSitesWithBackend':
-          await this.syncProtectedSitesWithBackend();
-          sendResponse({ success: true, message: 'Protected sites sync initiated' });
+          console.log('🔄 Syncing with backend');
+          // This would sync with your backend if needed
+          sendResponse({ success: true });
           break;
 
-        case 'generateSessionToken':
-          const token = await this.generateSessionToken();
-          sendResponse({ success: !!token, sessionToken: token });
+        case 'checkAccess':
+          console.log('🚪 Checking access for:', request.domain);
+          // This is called by content scripts
+          sendResponse({ success: true });
           break;
 
-        case 'forceSyncAllData':
+        case 'forceSyncAnalytics':
+          console.log('📈 Force syncing analytics');
           await this.forceSyncAllAnalyticsData();
-          sendResponse({ success: true, message: 'All data synced' });
+          sendResponse({ success: true });
           break;
 
-        case 'testSiteProtection':
-          console.log('🧪 Testing site protection for tab:', request.tabId);
-          try {
-            await this.handleTabChange(request.tabId);
-            sendResponse({ success: true, message: 'Site protection tested' });
-          } catch (error) {
-            console.error('Error testing site protection:', error);
-            sendResponse({ success: false, error: error.message });
-          }
-          break;
-          
         default:
-          sendResponse({ success: false, error: 'Unknown action' });
+          console.log('❓ Unknown action:', request.action);
+          sendResponse({ success: false, message: 'Unknown action' });
       }
     } catch (error) {
-      console.error('Error handling message:', error);
+      console.error('❌ Error handling message:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
