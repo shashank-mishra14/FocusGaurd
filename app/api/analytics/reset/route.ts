@@ -47,19 +47,24 @@ export async function DELETE(request: NextRequest) {
       user = userResult[0];
     }
 
-    // Delete all time tracking data for this user
-    await db.delete(timeTracking)
-      .where(eq(timeTracking.userId, user.id))
+    const dbUserId = user.id
+
+    // Delete all analytics for this user
+    const deleted = await db.delete(timeTracking).where(eq(timeTracking.userId, dbUserId))
 
     console.log(`Cleared analytics data for user ${user.id}`)
 
     return NextResponse.json({ 
-      success: true, 
-      message: 'All analytics data has been cleared',
+      success: true,
+      message: 'Analytics data reset successfully',
+      deletedRecords: deleted,
       userId: user.id
     }, { status: 200 })
   } catch (error) {
-    console.error('Error clearing analytics data:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error resetting analytics:', error)
+    return NextResponse.json({ 
+      error: 'Failed to reset analytics data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 } 

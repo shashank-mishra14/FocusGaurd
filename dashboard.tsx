@@ -240,7 +240,7 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   const hourlyData = (() => {
     // If we have hourly data from API, use it
     if (analyticsData?.hourlyTotals?.length) {
-      return analyticsData.hourlyTotals.map((hour: { hour: number; totalTime: number }) => {
+      return (analyticsData as any).hourlyTotals.map((hour: { hour: number; totalTime: number }) => {
         const hourFormatted = hour.hour === 0 ? "12AM" : 
                              hour.hour < 12 ? `${hour.hour}AM` : 
                              hour.hour === 12 ? "12PM" : 
@@ -401,10 +401,15 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   })()
 
   const detailedSiteData = analyticsData?.siteTotals?.map((site: { domain: string; totalTime: number; totalVisits: number }) => {
-    const hours = Math.floor(site.totalTime / 3600);
-    const minutes = Math.floor((site.totalTime % 3600) / 60);
+    // Convert from milliseconds to seconds if needed (backend sends milliseconds)
+    const timeInSeconds = site.totalTime > 3600000 ? Math.floor(site.totalTime / 1000) : site.totalTime;
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-    const avgSession = site.totalVisits > 0 ? `${Math.floor(site.totalTime / site.totalVisits / 60)}m` : "0m";
+    
+    // Cap visits at reasonable number to handle inflated data
+    const visits = Math.min(site.totalVisits, Math.ceil(timeInSeconds / 60)); // Max 1 visit per minute
+    const avgSession = visits > 0 ? `${Math.floor(timeInSeconds / visits / 60)}m` : "0m";
     
     // Categorize sites
     const getCategory = (domain: string) => {
@@ -422,9 +427,9 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
     return {
       site: site.domain,
       timeSpent,
-      visits: site.totalVisits,
+      visits: visits, // Use capped visits instead of raw totalVisits
       avgSession,
-      status: site.totalTime > 14400 ? "Over Limit" : "Within Limit", // 4 hours = 14400 seconds
+      status: timeInSeconds > 14400 ? "Over Limit" : "Within Limit", // 4 hours = 14400 seconds
       trend: "stable",
       category,
       productivity,
@@ -445,13 +450,17 @@ export default function AnalyticsDashboard({ sessionToken }: AnalyticsDashboardP
   ]
 
   // Calculate overview stats from real data
-  const totalTime = analyticsData?.dailyTotals?.reduce((sum: number, day: { totalTime: number }) => sum + day.totalTime, 0) || 0;
-  const totalHours = Math.floor(totalTime / 3600);
-  const totalMinutes = Math.floor((totalTime % 3600) / 60);
+  const totalTime = analyticsData?.siteTotals?.reduce((sum: number, site: { totalTime: number }) => sum + site.totalTime, 0) || 0;
+  // Convert from milliseconds to seconds if needed
+  const totalTimeInSeconds = totalTime > 3600000 ? Math.floor(totalTime / 1000) : totalTime;
+  const totalHours = Math.floor(totalTimeInSeconds / 3600);
+  const totalMinutes = Math.floor((totalTimeInSeconds % 3600) / 60);
   const totalTimeFormatted = totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`;
   
   const totalSites = analyticsData?.siteTotals?.length || 0;
-  const totalVisits = analyticsData?.dailyTotals?.reduce((sum: number, day: { totalVisits: number }) => sum + (day.totalVisits || 0), 0) || 0;
+  const rawTotalVisits = analyticsData?.siteTotals?.reduce((sum: number, site: { totalVisits: number }) => sum + site.totalVisits, 0) || 0;
+  // Cap total visits to reasonable number
+  const totalVisits = Math.min(rawTotalVisits, Math.ceil(totalTimeInSeconds / 60));
 
   // Calculate real stats from analytics data
   const avgFocusScore = dailyUsageData.reduce((sum, day) => sum + day.focus, 0) / dailyUsageData.length;

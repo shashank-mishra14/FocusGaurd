@@ -61,12 +61,19 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (existingRecord.length > 0) {
-      // Update existing record
+      // Update existing record - only increment visits if this is a new session
       const record = existingRecord[0]
+      const lastUpdate = record.updatedAt
+      const now = new Date()
+      const timeSinceLastUpdate = lastUpdate ? now.getTime() - lastUpdate.getTime() : 0
+      
+      // Only count as a new visit if more than 30 minutes since last update
+      const isNewVisit = timeSinceLastUpdate > 30 * 60 * 1000 // 30 minutes
+      
       const result = await db.update(timeTracking)
         .set({
           timeSpent: (record.timeSpent || 0) + Math.round(timeSpent),
-          visits: (record.visits || 0) + 1,
+          visits: isNewVisit ? (record.visits || 0) + 1 : (record.visits || 0),
           updatedAt: new Date(),
         })
         .where(and(
@@ -163,7 +170,7 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const url = new URL(request.url)
-    const period = parseInt(url.searchParams.get('period') || '7')
+    const period = parseInt(url.searchParams.get('period') || url.searchParams.get('days') || '7')
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - period)
     const startDateStr = startDate.toISOString().split('T')[0]
@@ -202,10 +209,46 @@ export async function GET(request: NextRequest) {
     )
     .orderBy(timeTracking.date)
 
-    // Structure the response
+    // Aggregate daily totals
+    interface DailyTotal {
+      date: string
+      totalTime: number
+      totalVisits: number
+    }
+    
+    const dailyTotals = dailyData.reduce((acc: DailyTotal[], day) => {
+      const existingDay = acc.find(d => d.date === day.date)
+      if (existingDay) {
+        existingDay.totalTime += day.totalTime || 0
+        existingDay.totalVisits += day.visits || 0
+      } else {
+        acc.push({
+          date: day.date,
+          totalTime: day.totalTime || 0,
+          totalVisits: day.visits || 0
+        })
+      }
+      return acc
+    }, [] as DailyTotal[]).sort((a, b) => a.date.localeCompare(b.date))
+
+    // Generate hourly data (placeholder for now, could be enhanced)
+    const hourlyTotals = []
+    for (let hour = 0; hour < 24; hour++) {
+      hourlyTotals.push({
+        hour,
+        totalTime: 0 // This could be calculated from more detailed time tracking
+      })
+    }
+
+    // Structure the response to match dashboard expectations
     const response = {
-      summary: analyticsData,
-      daily: dailyData,
+      siteTotals: analyticsData.map(site => ({
+        domain: site.domain,
+        totalTime: site.totalTime,
+        totalVisits: site.totalVisits
+      })),
+      dailyTotals,
+      hourlyTotals,
       period,
       startDate: startDateStr,
       endDate: new Date().toISOString().split('T')[0]

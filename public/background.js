@@ -5,6 +5,7 @@ class BackgroundService {
   constructor() {
     this.activeTimers = new Map();
     this.currentTab = null;
+    this.lastSyncTimes = new Map(); // Track last sync time per domain
     this.initializeExtension();
     this.setupEventListeners();
   }
@@ -664,8 +665,8 @@ class BackgroundService {
     this.stopTimer(tabId);
     
     const timer = setInterval(() => {
-      this.updateTimeSpent(domain, 1000); // Update every second
-    }, 1000);
+      this.updateTimeSpent(domain, 30000); // Update every 30 seconds
+    }, 30000); // 30 seconds instead of 1 second
     
     this.activeTimers.set(tabId, {
       timer,
@@ -711,9 +712,10 @@ class BackgroundService {
         dailyTotal: Math.round(updatedData[domain][today] / 1000) + 's'
       });
       
-      // Sync with backend if authenticated
-      if (extensionToken) {
-        await this.syncWithBackend(domain, timeSpent, today, currentHour);
+      // Sync with backend less frequently (only every 5 minutes)
+      if (extensionToken && this.shouldSyncToBackend(domain)) {
+        await this.syncWithBackend(domain, updatedData[domain][today], today, currentHour);
+        this.markLastSync(domain);
       }
       
       // Send analytics update to any open popups
@@ -1001,6 +1003,18 @@ class BackgroundService {
     } catch (error) {
       console.error('❌ Error in force sync:', error);
     }
+  }
+
+  shouldSyncToBackend(domain) {
+    const lastSync = this.lastSyncTimes.get(domain) || 0;
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+    
+    return (now - lastSync) > fiveMinutes;
+  }
+
+  markLastSync(domain) {
+    this.lastSyncTimes.set(domain, Date.now());
   }
 }
 
